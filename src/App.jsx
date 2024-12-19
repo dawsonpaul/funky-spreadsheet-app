@@ -350,7 +350,6 @@ const App = () => {
             )}
 
             {/* Results Table */}
-            {/* Results Table */}
             <Table>
               <TableHead>
                 <TableRow>
@@ -381,9 +380,22 @@ const App = () => {
                               size="small"
                               onClick={() => handleCollect(row)}
                               sx={{
-                                backgroundColor:
-                                  themeMode === "light" ? "#1976d2" : "#90caf9",
-                                color: themeMode === "light" ? "#fff" : "#000",
+                                backgroundColor: cart.some(
+                                  (item) => item.FQDN === row.FQDN
+                                )
+                                  ? themeMode === "light"
+                                    ? "#bbdefb" // Lighter blue for "Remove" in light theme
+                                    : "#0d47a1" // Darker blue for "Remove" in dark theme
+                                  : themeMode === "light"
+                                  ? "#1976d2" // Default blue in light theme
+                                  : "#90caf9", // Default light blue in dark theme
+                                color: cart.some(
+                                  (item) => item.FQDN === row.FQDN
+                                )
+                                  ? themeMode === "light"
+                                    ? "#000" // Black text for "Remove" in light theme
+                                    : "#fff" // White text for "Remove" in dark theme
+                                  : "#fff", // Default white text for "Collect"
                               }}
                             >
                               {cart.some((item) => item.FQDN === row.FQDN)
@@ -441,9 +453,20 @@ const App = () => {
                             size="small"
                             onClick={() => handleCollect(row)}
                             sx={{
-                              backgroundColor:
-                                themeMode === "light" ? "#1976d2" : "#90caf9",
-                              color: themeMode === "light" ? "#fff" : "#000",
+                              backgroundColor: cart.some(
+                                (item) => item.FQDN === row.FQDN
+                              )
+                                ? themeMode === "light"
+                                  ? "#bbdefb" // Lighter blue for "Remove" in light theme
+                                  : "#0d47a1" // Darker blue for "Remove" in dark theme
+                                : themeMode === "light"
+                                ? "#1976d2" // Default blue in light theme
+                                : "#90caf9", // Default light blue in dark theme
+                              color: cart.some((item) => item.FQDN === row.FQDN)
+                                ? themeMode === "light"
+                                  ? "#000" // Black text for "Remove" in light theme
+                                  : "#fff" // White text for "Remove" in dark theme
+                                : "#fff", // Default white text for "Collect"
                             }}
                           >
                             {cart.some((item) => item.FQDN === row.FQDN)
@@ -451,6 +474,7 @@ const App = () => {
                               : "Collect"}
                           </Button>
                         </TableCell>
+
                         <TableCell>
                           <Button
                             variant="contained"
