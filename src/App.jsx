@@ -57,6 +57,7 @@ const App = () => {
   const [activeRecordTab, setActiveRecordTab] = useState("A");
   const [cart, setCart] = useState([]);
   const [resolvedFqdn, setResolvedFqdn] = useState(null);
+  const [showCollected, setShowCollected] = useState(false);
 
   const handleThemeToggle = () => {
     setThemeMode((prevMode) => (prevMode === "light" ? "dark" : "light"));
@@ -209,10 +210,16 @@ const App = () => {
           }}
         >
           <Typography
-            sx={{ color: themeMode === "light" ? "#1976d2" : "#90caf9" }}
+            onClick={() => setShowCollected((prev) => !prev)}
+            sx={{
+              cursor: "pointer",
+              color: themeMode === "light" ? "#1976d2" : "#90caf9",
+              textDecoration: "underline",
+            }}
           >
-            {cart.length} Collected
+            #{cart.length} Collected
           </Typography>
+
           <Button
             variant="outlined"
             size="small"
@@ -365,152 +372,86 @@ const App = () => {
               </TableHead>
 
               <TableBody>
-                {resolvedFqdn
-                  ? filteredData
-                      .filter((row) => row.FQDN === resolvedFqdn) // Filter by resolved FQDN
-                      .map((row, rowIndex) => (
-                        <TableRow key={rowIndex}>
-                          <TableCell>{row.FQDN}</TableCell>
+                {(resolvedFqdn
+                  ? filteredData.filter((row) => row.FQDN === resolvedFqdn) // Show only resolved FQDN
+                  : showCollected
+                  ? filteredData.filter((row) =>
+                      cart.some((item) => item.FQDN === row.FQDN)
+                    ) // Show only collected items if "showCollected" is true
+                  : filteredData
+                ).map((row, rowIndex) => (
+                  <TableRow key={rowIndex}>
+                    <TableCell>{row.FQDN}</TableCell>
 
-                          {/* Collect Button */}
-                          <TableCell>
-                            <Button
-                              variant="contained"
-                              size="small"
-                              onClick={() => handleCollect(row)}
-                              sx={{
-                                backgroundColor: cart.some(
-                                  (item) => item.FQDN === row.FQDN
-                                )
-                                  ? themeMode === "light"
-                                    ? "#bbdefb" // Lighter blue for "Remove" in light theme
-                                    : "#0d47a1" // Darker blue for "Remove" in dark theme
-                                  : themeMode === "light"
-                                  ? "#1976d2" // Default blue in light theme
-                                  : "#90caf9", // Default light blue in dark theme
-                                color: cart.some(
-                                  (item) => item.FQDN === row.FQDN
-                                )
-                                  ? themeMode === "light"
-                                    ? "#000" // Black text for "Remove" in light theme
-                                    : "#fff" // White text for "Remove" in dark theme
-                                  : "#fff", // Default white text for "Collect"
-                              }}
-                            >
-                              {cart.some((item) => item.FQDN === row.FQDN)
-                                ? "Remove"
-                                : "Collect"}
-                            </Button>
-                          </TableCell>
+                    {/* Collect Button */}
+                    <TableCell>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={() => handleCollect(row)}
+                        sx={{
+                          backgroundColor: cart.some(
+                            (item) => item.FQDN === row.FQDN
+                          )
+                            ? themeMode === "light"
+                              ? "#bbdefb" // Lighter blue for "Remove" in light theme
+                              : "#0d47a1" // Darker blue for "Remove" in dark theme
+                            : themeMode === "light"
+                            ? "#1976d2" // Default blue in light theme
+                            : "#90caf9", // Default light blue in dark theme
+                          color: cart.some((item) => item.FQDN === row.FQDN)
+                            ? themeMode === "light"
+                              ? "#000" // Black text for "Remove" in light theme
+                              : "#fff" // White text for "Remove" in dark theme
+                            : "#fff", // Default white text for "Collect"
+                        }}
+                      >
+                        {cart.some((item) => item.FQDN === row.FQDN)
+                          ? "Remove"
+                          : "Collect"}
+                      </Button>
+                    </TableCell>
 
-                          {/* Resolve Button */}
-                          <TableCell>
-                            <Button
-                              variant="contained"
-                              size="small"
-                              onClick={() => handleResolve(row.FQDN)}
-                              disabled={loadingFqdn === row.FQDN} // Disable only the resolving FQDN
-                              sx={{
-                                backgroundColor:
-                                  loadingFqdn === row.FQDN
-                                    ? themeMode === "light"
-                                      ? "#e0e0e0" // Light grey while resolving
-                                      : "#424242" // Dark grey while resolving
-                                    : themeMode === "light"
-                                    ? "#1976d2" // Regular blue in light mode
-                                    : "#90caf9", // Regular light blue in dark mode
-                                color:
-                                  loadingFqdn === row.FQDN
-                                    ? themeMode === "light"
-                                      ? "#000" // Black text while resolving
-                                      : "#fff" // White text while resolving
-                                    : "#fff", // Regular white text
-                              }}
-                            >
-                              {loadingFqdn === row.FQDN ? (
-                                <CircularProgress size={20} color="inherit" /> // Show spinner while resolving
-                              ) : (
-                                "Resolve"
-                              )}
-                            </Button>
-                          </TableCell>
+                    {/* Resolve Button */}
+                    <TableCell>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={() => handleResolve(row.FQDN)}
+                        disabled={loadingFqdn === row.FQDN} // Disable only the resolving FQDN
+                        sx={{
+                          backgroundColor:
+                            loadingFqdn === row.FQDN
+                              ? themeMode === "light"
+                                ? "#e0e0e0" // Light grey while resolving
+                                : "#424242" // Dark grey while resolving
+                              : themeMode === "light"
+                              ? "#1976d2" // Regular blue in light mode
+                              : "#90caf9", // Regular light blue in dark mode
+                          color:
+                            loadingFqdn === row.FQDN
+                              ? themeMode === "light"
+                                ? "#000" // Black text while resolving
+                                : "#fff" // White text while resolving
+                              : "#fff", // Regular white text
+                        }}
+                      >
+                        {loadingFqdn === row.FQDN ? (
+                          <CircularProgress size={20} color="inherit" /> // Show spinner while resolving
+                        ) : (
+                          "Resolve"
+                        )}
+                      </Button>
+                    </TableCell>
 
-                          {/* Other Columns */}
-                          {columns
-                            .filter((col) => col !== "FQDN")
-                            .map((col, colIndex) => (
-                              <TableCell key={colIndex}>{row[col]}</TableCell>
-                            ))}
-                        </TableRow>
-                      ))
-                  : filteredData.map((row, rowIndex) => (
-                      <TableRow key={rowIndex}>
-                        <TableCell>{row.FQDN}</TableCell>
-                        <TableCell>
-                          <Button
-                            variant="contained"
-                            size="small"
-                            onClick={() => handleCollect(row)}
-                            sx={{
-                              backgroundColor: cart.some(
-                                (item) => item.FQDN === row.FQDN
-                              )
-                                ? themeMode === "light"
-                                  ? "#bbdefb" // Lighter blue for "Remove" in light theme
-                                  : "#0d47a1" // Darker blue for "Remove" in dark theme
-                                : themeMode === "light"
-                                ? "#1976d2" // Default blue in light theme
-                                : "#90caf9", // Default light blue in dark theme
-                              color: cart.some((item) => item.FQDN === row.FQDN)
-                                ? themeMode === "light"
-                                  ? "#000" // Black text for "Remove" in light theme
-                                  : "#fff" // White text for "Remove" in dark theme
-                                : "#fff", // Default white text for "Collect"
-                            }}
-                          >
-                            {cart.some((item) => item.FQDN === row.FQDN)
-                              ? "Remove"
-                              : "Collect"}
-                          </Button>
-                        </TableCell>
-
-                        <TableCell>
-                          <Button
-                            variant="contained"
-                            size="small"
-                            onClick={() => handleResolve(row.FQDN)}
-                            disabled={loadingFqdn === row.FQDN} // Disable only the resolving FQDN
-                            sx={{
-                              backgroundColor:
-                                loadingFqdn === row.FQDN
-                                  ? themeMode === "light"
-                                    ? "#e0e0e0" // Light grey while resolving
-                                    : "#424242" // Dark grey while resolving
-                                  : themeMode === "light"
-                                  ? "#1976d2" // Regular blue in light mode
-                                  : "#90caf9", // Regular light blue in dark mode
-                              color:
-                                loadingFqdn === row.FQDN
-                                  ? themeMode === "light"
-                                    ? "#000" // Black text while resolving
-                                    : "#fff" // White text while resolving
-                                  : "#fff", // Regular white text
-                            }}
-                          >
-                            {loadingFqdn === row.FQDN ? (
-                              <CircularProgress size={20} color="inherit" /> // Show spinner while resolving
-                            ) : (
-                              "Resolve"
-                            )}
-                          </Button>
-                        </TableCell>
-                        {columns
-                          .filter((col) => col !== "FQDN")
-                          .map((col, colIndex) => (
-                            <TableCell key={colIndex}>{row[col]}</TableCell>
-                          ))}
-                      </TableRow>
-                    ))}
+                    {/* Other Columns */}
+                    {columns
+                      .filter((col) => col !== "FQDN")
+                      .map((col, colIndex) => (
+                        <TableCell key={colIndex}>{row[col]}</TableCell>
+                      ))}
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </Box>
