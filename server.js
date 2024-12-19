@@ -1,6 +1,7 @@
 import express from "express";
 import { exec } from "child_process";
 import cors from "cors";
+import shellEscape from "shell-escape";
 
 const app = express();
 app.use(cors());
@@ -9,32 +10,24 @@ app.use(express.json());
 app.post("/resolve", (req, res) => {
   const { fqdn } = req.body;
 
-  if (!fqdn) {
-    return res.status(400).json({ error: "FQDN is required" });
+  if (!fqdn || !/^[a-zA-Z0-9.-]+$/.test(fqdn)) {
+    return res.status(400).json({ error: "Invalid or missing FQDN" });
   }
 
-  // Commands for Internal and External DNS lookups
-  const internalCommands = {
-    A: `dig +nocmd +noall +answer @192.168.1.1 ${fqdn} A`,
-    AAAA: `dig +nocmd +noall +answer @192.168.1.1 ${fqdn} AAAA`,
-    MX: `dig +nocmd +noall +answer @192.168.1.1 ${fqdn} MX`,
-    TXT: `dig +nocmd +noall +answer @192.168.1.1 ${fqdn} TXT`,
-    NS: `dig +nocmd +noall +answer @192.168.1.1 ${fqdn} NS`,
-    CNAME: `dig +nocmd +noall +answer @192.168.1.1 ${fqdn} CNAME`,
-    SOA: `dig +nocmd +noall +answer @192.168.1.1 ${fqdn} SOA`,
-    Stats: `dig +stats @192.168.1.1 ${fqdn}`,
-  };
+  // Generate dig commands dynamically with escaped arguments
+  const generateCommands = (dnsServer) => ({
+    A: shellEscape(["dig", "+nocmd", "+noall", "+answer", `@${dnsServer}`, fqdn, "A"]),
+    AAAA: shellEscape(["dig", "+nocmd", "+noall", "+answer", `@${dnsServer}`, fqdn, "AAAA"]),
+    MX: shellEscape(["dig", "+nocmd", "+noall", "+answer", `@${dnsServer}`, fqdn, "MX"]),
+    TXT: shellEscape(["dig", "+nocmd", "+noall", "+answer", `@${dnsServer}`, fqdn, "TXT"]),
+    NS: shellEscape(["dig", "+nocmd", "+noall", "+answer", `@${dnsServer}`, fqdn, "NS"]),
+    CNAME: shellEscape(["dig", "+nocmd", "+noall", "+answer", `@${dnsServer}`, fqdn, "CNAME"]),
+    SOA: shellEscape(["dig", "+nocmd", "+noall", "+answer", `@${dnsServer}`, fqdn, "SOA"]),
+    Stats: shellEscape(["dig", "+stats", `@${dnsServer}`, fqdn]),
+  });
 
-  const externalCommands = {
-    A: `dig +nocmd +noall +answer @8.8.8.8 ${fqdn} A`,
-    AAAA: `dig +nocmd +noall +answer @8.8.8.8 ${fqdn} AAAA`,
-    MX: `dig +nocmd +noall +answer @8.8.8.8 ${fqdn} MX`,
-    TXT: `dig +nocmd +noall +answer @8.8.8.8 ${fqdn} TXT`,
-    NS: `dig +nocmd +noall +answer @8.8.8.8 ${fqdn} NS`,
-    CNAME: `dig +nocmd +noall +answer @8.8.8.8 ${fqdn} CNAME`,
-    SOA: `dig +nocmd +noall +answer @8.8.8.8 ${fqdn} SOA`,
-    Stats: `dig +stats @8.8.8.8 ${fqdn}`,
-  };
+  const internalCommands = generateCommands("192.168.1.1");
+  const externalCommands = generateCommands("8.8.8.8");
 
   const parseDigOutput = (output) => {
     if (!output) return [];
