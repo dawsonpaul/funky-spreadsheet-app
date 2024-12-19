@@ -182,11 +182,10 @@ const App = () => {
       <Box
         sx={{
           width: "100vw",
-          height: "100vh",
+          minHeight: "100vh", // Ensures the background color covers the entire height
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          justifyContent: "flex-start",
           backgroundColor: themeMode === "light" ? "#f5f5f5" : "#121212",
           padding: "20px",
         }}
