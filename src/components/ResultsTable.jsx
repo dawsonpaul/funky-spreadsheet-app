@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { 
   Table, 
   TableBody, 
@@ -9,7 +9,8 @@ import {
   CircularProgress,
   TablePagination,
   Box,
-  Typography 
+  Typography,
+  Tooltip 
 } from '@mui/material';
 
 const ROWS_PER_PAGE_OPTIONS = [10, 25, 50];
@@ -25,8 +26,9 @@ const ResultsTable = ({
   onCollect,
   onResolve
 }) => {
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(ROWS_PER_PAGE_OPTIONS[0]);
+  const [page, setPage] = React.useState(0);
+  const [rowsPerPage, setRowsPerPage] = React.useState(ROWS_PER_PAGE_OPTIONS[0]);
+  const [copiedRow, setCopiedRow] = React.useState(null); // Track which row was just copied
 
   // Get the data to display based on filters
   const displayData = resolvedFqdn
@@ -53,6 +55,20 @@ const ResultsTable = ({
     setPage(0);
   };
 
+  const handleCopyRow = (row) => {
+    // Create a string of all visible column values
+    const rowValues = ['FQDN', ...columns.filter(col => col !== 'FQDN')]
+      .map(col => row[col])
+      .join('\t');
+      
+    navigator.clipboard.writeText(rowValues)
+      .then(() => {
+        setCopiedRow(row.FQDN);
+        setTimeout(() => setCopiedRow(null), 2000); // Reset after 2 seconds
+      })
+      .catch(err => console.error('Failed to copy row:', err));
+  };
+
   if (totalRows === 0) {
     return (
       <Box sx={{ textAlign: 'center', mt: 2 }}>
@@ -62,7 +78,7 @@ const ResultsTable = ({
   }
 
   return (
-    <>
+    <Box sx={{ width: '100%' }}>
       <Box sx={{ mb: 2 }}>
         <Typography>
           Showing {paginatedData.length} of {totalRows} results
@@ -75,6 +91,7 @@ const ResultsTable = ({
             <TableCell>FQDN</TableCell>
             <TableCell>Collection</TableCell>
             <TableCell>DNS Query</TableCell>
+            <TableCell>Copy</TableCell>
             {columns
               .filter((col) => col !== 'FQDN')
               .map((col, index) => (
@@ -143,6 +160,26 @@ const ResultsTable = ({
                 </Button>
               </TableCell>
 
+              <TableCell>
+                <Tooltip title={copiedRow === row.FQDN ? "Copied!" : "Copy row"}>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => handleCopyRow(row)}
+                    sx={{
+                      minWidth: '40px',
+                      backgroundColor: copiedRow === row.FQDN
+                        ? themeMode === 'light'
+                          ? '#e8f5e9'
+                          : '#1b5e20'
+                        : 'transparent'
+                    }}
+                  >
+                    <span role="img" aria-label="copy">📋</span>
+                  </Button>
+                </Tooltip>
+              </TableCell>
+
               {columns
                 .filter((col) => col !== 'FQDN')
                 .map((col, colIndex) => (
@@ -162,7 +199,7 @@ const ResultsTable = ({
         onRowsPerPageChange={handleChangeRowsPerPage}
         rowsPerPageOptions={ROWS_PER_PAGE_OPTIONS}
       />
-    </>
+    </Box>
   );
 };
 

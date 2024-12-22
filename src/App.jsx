@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { Box, Button, ThemeProvider } from "@mui/material";
-import { lightTheme, darkTheme } from './themes/themes.js';
+import { lightTheme, darkTheme } from "./themes/themes.js";
 import { resolveFqdn } from "./utils/dnsHelpers";
 import Header from "./components/Header";
 import CartBox from "./components/CartBox";
@@ -8,6 +8,7 @@ import FileUpload from "./components/FileUpload";
 import SearchSection from "./components/SearchSection";
 import ResultsTable from "./components/ResultsTable";
 import DnsResults from "./components/DnsResults";
+import ColumnManager from "./components/ColumnManager";
 
 const App = () => {
   const [themeMode, setThemeMode] = useState("light");
@@ -23,6 +24,19 @@ const App = () => {
   const [resolvedFqdn, setResolvedFqdn] = useState(null);
   const [showCollected, setShowCollected] = useState(false);
   const [loadingFqdn, setLoadingFqdn] = useState("");
+  const [visibleColumns, setVisibleColumns] = useState([]);
+
+  // Determine default and available columns
+  const defaultColumns = useMemo(() => {
+    if (!columns.length) return [];
+    return columns.filter(
+      (col) =>
+        col === "FQDN" ||
+        col === "APPID" ||
+        col.toLowerCase().includes("name") ||
+        col.toLowerCase().includes("email")
+    );
+  }, [columns]);
 
   const handleThemeToggle = () => {
     setThemeMode((prevMode) => (prevMode === "light" ? "dark" : "light"));
@@ -34,6 +48,16 @@ const App = () => {
       setFqdnData(jsonData);
       setColumns(newColumns);
       setSelectedColumn(newColumns[0]);
+
+      // Set initial visible columns
+      const initialVisibleColumns = newColumns.filter(
+        (col) =>
+          col === "FQDN" ||
+          col === "APPID" ||
+          col.toLowerCase().includes("name") ||
+          col.toLowerCase().includes("email")
+      );
+      setVisibleColumns(initialVisibleColumns);
     }
   };
 
@@ -64,7 +88,7 @@ const App = () => {
   // Memoized filtered data
   const filteredData = useMemo(() => {
     if (searchTerm.length < 3) return [];
-    
+
     return fqdnData.filter((row) => {
       if (!selectedColumn || !row[selectedColumn]) return false;
       const value = row[selectedColumn].toString().toLowerCase();
@@ -92,30 +116,33 @@ const App = () => {
           onShowCollected={() => setShowCollected((prev) => !prev)}
         />
 
-        <Header
-          themeMode={themeMode}
-          onThemeToggle={handleThemeToggle}
-        />
+        <Header themeMode={themeMode} onThemeToggle={handleThemeToggle} />
 
-        <FileUpload
-          onFileUpload={handleFileUpload}
-          error={error}
-        />
+        <FileUpload onFileUpload={handleFileUpload} error={error} />
 
         {fqdnData.length > 0 && (
-          <Box sx={{
-            width: "100%",
-            maxWidth: "800px",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-          }}>
+          <Box
+            sx={{
+              width: "100%",
+              maxWidth: "800px",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+            }}
+          >
             <SearchSection
               columns={columns}
               selectedColumn={selectedColumn}
               searchTerm={searchTerm}
               onColumnChange={setSelectedColumn}
               onSearchTermChange={handleSearchTermChange}
+            />
+
+            <ColumnManager
+              allColumns={columns}
+              visibleColumns={visibleColumns}
+              onColumnChange={setVisibleColumns}
+              defaultColumns={defaultColumns}
             />
 
             {resolvedFqdn && (
@@ -133,7 +160,7 @@ const App = () => {
             )}
 
             <ResultsTable
-              columns={columns}
+              columns={visibleColumns}
               filteredData={filteredData}
               resolvedFqdn={resolvedFqdn}
               showCollected={showCollected}
