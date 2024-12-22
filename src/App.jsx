@@ -25,6 +25,7 @@ const App = () => {
   const [showCollected, setShowCollected] = useState(false);
   const [loadingFqdn, setLoadingFqdn] = useState("");
   const [visibleColumns, setVisibleColumns] = useState([]);
+  const [selectedRows, setSelectedRows] = useState([]);
 
   // Determine default and available columns
   const defaultColumns = useMemo(() => {
@@ -60,6 +61,7 @@ const App = () => {
       setVisibleColumns(initialVisibleColumns);
     }
   };
+
 
   const handleResolve = async (fqdn) => {
     setResolvedFqdn(fqdn);
@@ -105,81 +107,74 @@ const App = () => {
           minHeight: "100vh",
           display: "flex",
           flexDirection: "column",
-          alignItems: "center",
           backgroundColor: themeMode === "light" ? "#f5f5f5" : "#121212",
           padding: "20px",
         }}
       >
-        <CartBox
-          cart={cart}
-          themeMode={themeMode}
-          onShowCollected={() => setShowCollected((prev) => !prev)}
-        />
+        <Box sx={{ maxWidth: "1200px", width: "100%", margin: "0 auto" }}>
+          <CartBox
+            cart={cart}
+            themeMode={themeMode}
+            onShowCollected={() => setShowCollected((prev) => !prev)}
+          />
 
-        <Header themeMode={themeMode} onThemeToggle={handleThemeToggle} />
+          <Header themeMode={themeMode} onThemeToggle={handleThemeToggle} />
 
-        <FileUpload onFileUpload={handleFileUpload} error={error} />
+          <FileUpload onFileUpload={handleFileUpload} error={error} />
 
-        {fqdnData.length > 0 && (
-          <Box
-            sx={{
-              width: "100%",
-              maxWidth: "800px",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-            }}
-          >
-            <SearchSection
-              columns={columns}
-              selectedColumn={selectedColumn}
-              searchTerm={searchTerm}
-              onColumnChange={setSelectedColumn}
-              onSearchTermChange={handleSearchTermChange}
-            />
+          {fqdnData.length > 0 && (
+            <Box>
+              <SearchSection
+                columns={columns}
+                selectedColumn={selectedColumn}
+                searchTerm={searchTerm}
+                onColumnChange={setSelectedColumn}
+                onSearchTermChange={handleSearchTermChange}
+              />
 
-            <ColumnManager
-              allColumns={columns}
-              visibleColumns={visibleColumns}
-              onColumnChange={setVisibleColumns}
-              defaultColumns={defaultColumns}
-            />
+              <ColumnManager
+                allColumns={columns}
+                visibleColumns={visibleColumns}
+                onColumnChange={setVisibleColumns}
+                defaultColumns={defaultColumns}
+              />
 
-            {resolvedFqdn && (
-              <Button
-                sx={{ marginBottom: "20px" }}
-                variant="outlined"
-                onClick={() => {
-                  setResolvedFqdn(null);
-                  setResolveResults(null);
-                  setLoadingFqdn("");
-                }}
-              >
-                Reset
-              </Button>
-            )}
+              {resolvedFqdn && (
+                <Button
+                  variant="outlined"
+                  onClick={() => {
+                    setResolvedFqdn(null);
+                    setResolveResults(null);
+                    setLoadingFqdn("");
+                  }}
+                  sx={{ mb: 2 }}
+                >
+                  Reset
+                </Button>
+              )}
 
-            <ResultsTable
-              columns={visibleColumns}
-              filteredData={filteredData}
-              resolvedFqdn={resolvedFqdn}
-              showCollected={showCollected}
-              cart={cart}
-              loadingFqdn={loadingFqdn}
-              themeMode={themeMode}
-              onCollect={handleCollect}
-              onResolve={handleResolve}
-            />
-          </Box>
-        )}
+              <ResultsTable
+                columns={visibleColumns}
+                filteredData={filteredData}
+                resolvedFqdn={resolvedFqdn}
+                showCollected={showCollected}
+                cart={cart}
+                loadingFqdn={loadingFqdn}
+                themeMode={themeMode}
+                onCollect={handleCollect}
+                onResolve={handleResolve}
+              />
+            </Box>
+          )}
 
-        <DnsResults
-          resolveResults={resolveResults}
-          activeTab={activeTab}
-          activeRecordTab={activeRecordTab}
-          onTabChange={setActiveTab}
-          onRecordTabChange={setActiveRecordTab}
-        />
+          <DnsResults
+            resolveResults={resolveResults}
+            activeTab={activeTab}
+            activeRecordTab={activeRecordTab}
+            onTabChange={setActiveTab}
+            onRecordTabChange={setActiveRecordTab}
+          />
+        </Box>
       </Box>
     </ThemeProvider>
   );
