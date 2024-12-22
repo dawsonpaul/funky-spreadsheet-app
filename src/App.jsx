@@ -1,48 +1,13 @@
-import React, { useState } from "react";
-import axios from "axios";
-import * as XLSX from "xlsx";
-import { CircularProgress } from "@mui/material";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-  Button,
-  Typography,
-  Box,
-  Card,
-  CardContent,
-  Tabs,
-  Tab,
-  TextField,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Switch,
-  FormControlLabel,
-  ThemeProvider,
-  createTheme,
-} from "@mui/material";
-
-const lightTheme = createTheme({
-  palette: {
-    mode: "light",
-    primary: { main: "#1976d2" },
-    secondary: { main: "#d32f2f" },
-    background: { default: "#f5f5f5" },
-  },
-});
-
-const darkTheme = createTheme({
-  palette: {
-    mode: "dark",
-    primary: { main: "#90caf9" },
-    secondary: { main: "#f48fb1" },
-    background: { default: "#121212" },
-  },
-});
+import React, { useState, useMemo } from "react";
+import { Box, Button, ThemeProvider } from "@mui/material";
+import { lightTheme, darkTheme } from './themes/themes.js';
+import { resolveFqdn } from "./utils/dnsHelpers";
+import Header from "./components/Header";
+import CartBox from "./components/CartBox";
+import FileUpload from "./components/FileUpload";
+import SearchSection from "./components/SearchSection";
+import ResultsTable from "./components/ResultsTable";
+import DnsResults from "./components/DnsResults";
 
 const App = () => {
   const [themeMode, setThemeMode] = useState("light");
@@ -51,139 +16,69 @@ const App = () => {
   const [selectedColumn, setSelectedColumn] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [resolveResults, setResolveResults] = useState(null);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("internal");
   const [activeRecordTab, setActiveRecordTab] = useState("A");
   const [cart, setCart] = useState([]);
   const [resolvedFqdn, setResolvedFqdn] = useState(null);
   const [showCollected, setShowCollected] = useState(false);
+  const [loadingFqdn, setLoadingFqdn] = useState("");
 
   const handleThemeToggle = () => {
     setThemeMode((prevMode) => (prevMode === "light" ? "dark" : "light"));
   };
 
-  const handleFileUpload = (event) => {
-    setError("");
-    const file = event.target.files[0];
-    if (!file) {
-      setError("Please upload a valid file.");
-      return;
+  const handleFileUpload = (jsonData, newColumns, errorMessage) => {
+    setError(errorMessage);
+    if (jsonData && newColumns) {
+      setFqdnData(jsonData);
+      setColumns(newColumns);
+      setSelectedColumn(newColumns[0]);
     }
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const binaryStr = e.target.result;
-        const workbook = XLSX.read(binaryStr, { type: "binary" });
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(sheet);
-
-        if (jsonData.length === 0) {
-          setError("The file is empty or invalid.");
-          return;
-        }
-
-        setColumns(Object.keys(jsonData[0]));
-        setSelectedColumn(Object.keys(jsonData[0])[0]);
-        setFqdnData(jsonData);
-      } catch (err) {
-        setError("Failed to parse the file.");
-      }
-    };
-    reader.readAsBinaryString(file);
   };
-
-  const [loadingFqdn, setLoadingFqdn] = useState(""); // Track which FQDN is being resolved
 
   const handleResolve = async (fqdn) => {
-    setResolvedFqdn(fqdn); // Filter table to show only the resolving FQDN immediately
-    setLoadingFqdn(fqdn); // Set the currently loading FQDN
-    try {
-      const response = await axios.post("http://localhost:5005/resolve", {
-        fqdn,
-      });
-      setResolveResults(response.data); // Store the resolve results
-    } catch (error) {
-      console.error("Error resolving FQDN:", error);
-      setResolveResults({
-        error: "Failed to resolve the FQDN. Please try again.",
-      });
-    } finally {
-      setLoadingFqdn(""); // Ensure button state is reset
-    }
+    setResolvedFqdn(fqdn);
+    setLoadingFqdn(fqdn);
+    const results = await resolveFqdn(fqdn);
+    setResolveResults(results);
+    setLoadingFqdn("");
   };
-
-  const handleSearchTermChange = (e) => {
-    setSearchTerm(e.target.value);
-    setResolveResults(null); // Clear DNS results when starting a new search
-  };
-
-  const filteredData =
-    searchTerm.length > 2
-      ? fqdnData.filter((row) =>
-          selectedColumn
-            ? row[selectedColumn]
-                ?.toString()
-                .toLowerCase()
-                .includes(searchTerm.toLowerCase())
-            : true
-        )
-      : [];
 
   const handleCollect = (row) => {
     setCart((prevCart) => {
-      // Check if the row is already in the cart
       const isAlreadyCollected = prevCart.some(
         (item) => item.FQDN === row.FQDN
       );
-      if (isAlreadyCollected) {
-        // Remove the row from the cart
-        return prevCart.filter((item) => item.FQDN !== row.FQDN);
-      } else {
-        // Add the row to the cart
-        return [...prevCart, row];
-      }
+      return isAlreadyCollected
+        ? prevCart.filter((item) => item.FQDN !== row.FQDN)
+        : [...prevCart, row];
     });
   };
 
-  const renderDnsRecords = (recordType, records) => {
-    if (!records || records.error) {
-      return (
-        <Typography>
-          No {recordType} records found or failed to resolve.
-        </Typography>
-      );
-    }
-
-    return records.map((record, index) => (
-      <Box key={index} sx={{ marginBottom: "10px" }}>
-        <Typography>Name: {record.name}</Typography>
-        <Typography>TTL: {record.ttl}</Typography>
-        <Typography>Type: {record.type}</Typography>
-        <Typography>Value: {record.value}</Typography>
-        <hr />
-      </Box>
-    ));
+  const handleSearchTermChange = (value) => {
+    setSearchTerm(value);
+    setResolveResults(null);
   };
 
-  const handleDownloadCart = () => {
-    const blob = new Blob([JSON.stringify(cart, null, 2)], {
-      type: "application/json",
+  // Memoized filtered data
+  const filteredData = useMemo(() => {
+    if (searchTerm.length < 3) return [];
+    
+    return fqdnData.filter((row) => {
+      if (!selectedColumn || !row[selectedColumn]) return false;
+      const value = row[selectedColumn].toString().toLowerCase();
+      const search = searchTerm.toLowerCase();
+      return value.includes(search);
     });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = "collected_rows.json";
-    link.click();
-  };
+  }, [fqdnData, selectedColumn, searchTerm]);
 
   return (
     <ThemeProvider theme={themeMode === "light" ? lightTheme : darkTheme}>
       <Box
         sx={{
           width: "100vw",
-          minHeight: "100vh", // Ensures the background color covers the entire height
+          minHeight: "100vh",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
@@ -191,155 +86,37 @@ const App = () => {
           padding: "20px",
         }}
       >
-        {/* Cart Box */}
-        <Box
-          sx={{
-            position: "absolute",
-            top: "20px",
-            right: "20px",
-            display: "flex",
-            alignItems: "center",
-            gap: "10px",
-            backgroundColor: themeMode === "dark" ? "#2c2c2c" : "#f5f5f5", // Dark gray in dark mode, light gray in light mode
-            padding: "10px 20px",
-            borderRadius: "20px",
-            boxShadow:
-              themeMode === "dark"
-                ? "0 4px 8px rgba(0, 0, 0, 0.6)" // Darker shadow in dark mode
-                : "0 4px 8px rgba(0, 0, 0, 0.2)", // Subtle shadow in light mode
-          }}
-        >
-          <Typography
-            onClick={() => setShowCollected((prev) => !prev)}
-            sx={{
-              cursor: "pointer",
-              color: themeMode === "light" ? "#1976d2" : "#90caf9",
-              textDecoration: "underline",
-            }}
-          >
-            #{cart.length} Collected
-          </Typography>
+        <CartBox
+          cart={cart}
+          themeMode={themeMode}
+          onShowCollected={() => setShowCollected((prev) => !prev)}
+        />
 
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={handleDownloadCart}
-            sx={{
-              color: themeMode === "light" ? "#1976d2" : "#90caf9", // Text color: Blue in both modes
-              borderColor: themeMode === "light" ? "#1976d2" : "#90caf9", // Border color: Blue in both modes
-              backgroundColor: "transparent", // No background for the button
-            }}
-          >
-            <span role="img" aria-label="Cart">
-              🛒
-            </span>
-          </Button>
-        </Box>
+        <Header
+          themeMode={themeMode}
+          onThemeToggle={handleThemeToggle}
+        />
 
-        {/* Heading Section */}
-        <Box
-          sx={{
-            textAlign: "center",
-            marginBottom: "20px",
-          }}
-        >
-          <Typography
-            variant="h4"
-            sx={{
-              color: themeMode === "light" ? "#1976d2" : "#90caf9",
-            }}
-          >
-            FQDN Resolver
-          </Typography>
+        <FileUpload
+          onFileUpload={handleFileUpload}
+          error={error}
+        />
 
-          <FormControlLabel
-            control={
-              <Switch
-                checked={themeMode === "dark"}
-                onChange={handleThemeToggle}
-              />
-            }
-            label="Dark Mode"
-            sx={{
-              color: themeMode === "light" ? "#1976d2" : "#90caf9",
-            }}
-          />
-        </Box>
-
-        {/* Upload Section */}
-        <Box
-          sx={{
+        {fqdnData.length > 0 && (
+          <Box sx={{
             width: "100%",
             maxWidth: "800px",
-            textAlign: "center",
-            marginBottom: "20px",
-          }}
-        >
-          <Button
-            variant="contained"
-            component="label"
-            sx={{ marginBottom: "20px" }}
-          >
-            Upload Spreadsheet
-            <input
-              type="file"
-              hidden
-              accept=".xlsx, .xls"
-              onChange={handleFileUpload}
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+          }}>
+            <SearchSection
+              columns={columns}
+              selectedColumn={selectedColumn}
+              searchTerm={searchTerm}
+              onColumnChange={setSelectedColumn}
+              onSearchTermChange={handleSearchTermChange}
             />
-          </Button>
-          {error && (
-            <Typography color="error" sx={{ marginTop: "10px" }}>
-              {error}
-            </Typography>
-          )}
-        </Box>
-
-        {/* Search and Results Section */}
-        {fqdnData.length > 0 && (
-          <Box
-            sx={{
-              width: "100%",
-              maxWidth: "800px",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-            }}
-          >
-            {/* Search Section */}
-            <Box
-              sx={{
-                display: "flex",
-                gap: "10px",
-                alignItems: "center",
-                width: "100%",
-                marginBottom: "20px",
-              }}
-            >
-              <FormControl sx={{ flex: 1 }}>
-                <InputLabel id="search-column-label">
-                  Search By Column
-                </InputLabel>
-                <Select
-                  labelId="search-column-label"
-                  label="Search By Column"
-                  value={selectedColumn}
-                  onChange={(e) => setSelectedColumn(e.target.value)}
-                >
-                  {columns.map((col) => (
-                    <MenuItem key={col} value={col}>
-                      {col}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <TextField
-                sx={{ flex: 2 }}
-                placeholder="Enter search term"
-                value={searchTerm}
-                onChange={handleSearchTermChange}
-              />
-            </Box>
 
             {resolvedFqdn && (
               <Button
@@ -347,181 +124,35 @@ const App = () => {
                 variant="outlined"
                 onClick={() => {
                   setResolvedFqdn(null);
-                  setResolveResults(null); // Clear the DNS results
-                  setLoadingFqdn(""); // Ensure loading state is cleared
+                  setResolveResults(null);
+                  setLoadingFqdn("");
                 }}
               >
                 Reset
               </Button>
             )}
 
-            {/* Results Table */}
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>FQDN</TableCell>
-                  <TableCell>Collection</TableCell>
-                  <TableCell>DNS Query</TableCell>{" "}
-                  {/* For Collect and Resolve */}
-                  {columns
-                    .filter((col) => col !== "FQDN") // Exclude FQDN
-                    .map((col, index) => (
-                      <TableCell key={index}>{col}</TableCell>
-                    ))}
-                </TableRow>
-              </TableHead>
-
-              <TableBody>
-                {(resolvedFqdn
-                  ? filteredData.filter((row) => row.FQDN === resolvedFqdn) // Show only resolved FQDN
-                  : showCollected
-                  ? filteredData.filter((row) =>
-                      cart.some((item) => item.FQDN === row.FQDN)
-                    ) // Show only collected items if "showCollected" is true
-                  : filteredData
-                ).map((row, rowIndex) => (
-                  <TableRow key={rowIndex}>
-                    <TableCell>{row.FQDN}</TableCell>
-
-                    {/* Collect Button */}
-                    <TableCell>
-                      <Button
-                        variant="contained"
-                        size="small"
-                        onClick={() => handleCollect(row)}
-                        sx={{
-                          backgroundColor: cart.some(
-                            (item) => item.FQDN === row.FQDN
-                          )
-                            ? themeMode === "light"
-                              ? "#bbdefb" // Lighter blue for "Remove" in light theme
-                              : "#0d47a1" // Darker blue for "Remove" in dark theme
-                            : themeMode === "light"
-                            ? "#1976d2" // Default blue in light theme
-                            : "#90caf9", // Default light blue in dark theme
-                          color: cart.some((item) => item.FQDN === row.FQDN)
-                            ? themeMode === "light"
-                              ? "#000" // Black text for "Remove" in light theme
-                              : "#fff" // White text for "Remove" in dark theme
-                            : "#fff", // Default white text for "Collect"
-                        }}
-                      >
-                        {cart.some((item) => item.FQDN === row.FQDN)
-                          ? "Remove"
-                          : "Collect"}
-                      </Button>
-                    </TableCell>
-
-                    {/* Resolve Button */}
-                    <TableCell>
-                      <Button
-                        variant="contained"
-                        size="small"
-                        onClick={() => handleResolve(row.FQDN)}
-                        disabled={loadingFqdn === row.FQDN} // Disable only the resolving FQDN
-                        sx={{
-                          backgroundColor:
-                            loadingFqdn === row.FQDN
-                              ? themeMode === "light"
-                                ? "#e0e0e0" // Light grey while resolving
-                                : "#424242" // Dark grey while resolving
-                              : themeMode === "light"
-                              ? "#1976d2" // Regular blue in light mode
-                              : "#90caf9", // Regular light blue in dark mode
-                          color:
-                            loadingFqdn === row.FQDN
-                              ? themeMode === "light"
-                                ? "#000" // Black text while resolving
-                                : "#fff" // White text while resolving
-                              : "#fff", // Regular white text
-                        }}
-                      >
-                        {loadingFqdn === row.FQDN ? (
-                          <CircularProgress size={20} color="inherit" /> // Show spinner while resolving
-                        ) : (
-                          "Resolve"
-                        )}
-                      </Button>
-                    </TableCell>
-
-                    {/* Other Columns */}
-                    {columns
-                      .filter((col) => col !== "FQDN")
-                      .map((col, colIndex) => (
-                        <TableCell key={colIndex}>{row[col]}</TableCell>
-                      ))}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <ResultsTable
+              columns={columns}
+              filteredData={filteredData}
+              resolvedFqdn={resolvedFqdn}
+              showCollected={showCollected}
+              cart={cart}
+              loadingFqdn={loadingFqdn}
+              themeMode={themeMode}
+              onCollect={handleCollect}
+              onResolve={handleResolve}
+            />
           </Box>
         )}
 
-        {/* Results Section */}
-        {resolveResults && (
-          <Box sx={{ width: "100%", maxWidth: "800px", marginTop: "20px" }}>
-            <Tabs
-              value={activeTab}
-              onChange={(e, newValue) => setActiveTab(newValue)}
-              centered
-              indicatorColor="primary"
-              textColor="primary"
-            >
-              <Tab label="Internal DNS" value="internal" />
-              <Tab label="External DNS" value="external" />
-            </Tabs>
-
-            {resolveResults[activeTab] ? (
-              <Box>
-                <Tabs
-                  value={activeRecordTab}
-                  onChange={(e, newValue) => setActiveRecordTab(newValue)}
-                  centered
-                  indicatorColor="primary"
-                  textColor="primary"
-                  sx={{ marginTop: "20px" }}
-                >
-                  {Object.keys(resolveResults[activeTab]).map((recordType) => (
-                    <Tab
-                      key={recordType}
-                      label={recordType}
-                      value={recordType}
-                    />
-                  ))}
-                </Tabs>
-
-                <Card sx={{ marginTop: "20px", padding: "20px" }}>
-                  <CardContent>
-                    <Typography variant="h6">
-                      {activeRecordTab} Records ({activeTab})
-                    </Typography>
-                    {resolveResults[activeTab][activeRecordTab]?.length > 0 ? (
-                      resolveResults[activeTab][activeRecordTab].map(
-                        (record, index) => (
-                          <Box key={index} sx={{ marginBottom: "10px" }}>
-                            <Typography>Name: {record.name}</Typography>
-                            <Typography>TTL: {record.ttl}</Typography>
-                            <Typography>Type: {record.type}</Typography>
-                            <Typography>Value: {record.value}</Typography>
-                            <hr />
-                          </Box>
-                        )
-                      )
-                    ) : (
-                      <Typography>
-                        No {activeRecordTab} records found or failed to resolve.
-                      </Typography>
-                    )}
-                  </CardContent>
-                </Card>
-              </Box>
-            ) : (
-              <Typography sx={{ marginTop: "20px" }}>
-                No data available for {activeTab} DNS.
-              </Typography>
-            )}
-          </Box>
-        )}
+        <DnsResults
+          resolveResults={resolveResults}
+          activeTab={activeTab}
+          activeRecordTab={activeRecordTab}
+          onTabChange={setActiveTab}
+          onRecordTabChange={setActiveRecordTab}
+        />
       </Box>
     </ThemeProvider>
   );
