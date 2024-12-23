@@ -112,9 +112,22 @@ const App = () => {
   const handleResolve = async (fqdn) => {
     setResolvedFqdn(fqdn);
     setLoadingFqdn(fqdn);
-    const results = await resolveFqdn(fqdn);
-    setResolveResults(results);
-    setLoadingFqdn("");
+    try {
+      const response = await fetch("http://localhost:5005/resolve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fqdn }),
+      });
+      const data = await response.json();
+
+      console.log("Raw DNS Response:", data); // Ensure full response is logged
+      setResolveResults(data); // Set the complete response
+      console.log("Updated resolveResults:", data); // Log the updated state
+      setLoadingFqdn("");
+    } catch (error) {
+      console.error("Error resolving DNS:", error);
+      setLoadingFqdn("");
+    }
   };
 
   const handleCollect = (row) => {

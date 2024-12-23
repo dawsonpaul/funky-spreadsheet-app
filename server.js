@@ -1,86 +1,145 @@
 import express from "express";
-import { exec } from "child_process";
 import cors from "cors";
-import shellEscape from "shell-escape";
+import dns from "dns/promises";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.post("/resolve", (req, res) => {
+// Configure DNS resolvers with increased timeout
+const createResolver = (server) => {
+  const resolver = new dns.Resolver({
+    timeout: 10000,
+    tries: 3
+  });
+  resolver.setServers([server]);
+  return resolver;
+};
+
+const internalResolver = createResolver('4.2.2.1');
+const externalResolver = createResolver('8.8.8.8');
+
+// Helper function to format DNS records
+const formatRecord = (name, ttl, type, value) => ({
+  name: name.endsWith('.') ? name : `${name}.`,
+  ttl: String(ttl),
+  class: 'IN',
+  type,
+  value: String(value)
+});
+
+const resolveDNSRecord = async (resolver, fqdn, type) => {
+  try {
+    let records = [];
+    switch (type) {
+      case 'A':
+        const aRecords = await resolver.resolve4(fqdn);
+        records = aRecords.map(ip => formatRecord(fqdn, 300, 'A', ip));
+        break;
+      
+      case 'AAAA':
+        const aaaaRecords = await resolver.resolve6(fqdn);
+        records = aaaaRecords.map(ip => formatRecord(fqdn, 300, 'AAAA', ip));
+        break;
+
+      case 'MX':
+        const mxRecords = await resolver.resolveMx(fqdn);
+        records = mxRecords.map(({ priority, exchange }) => 
+          formatRecord(fqdn, 300, 'MX', `${priority} ${exchange}`));
+        break;
+
+      case 'TXT':
+        const txtRecords = await resolver.resolveTxt(fqdn);
+        records = txtRecords.map(txtArray => 
+          formatRecord(fqdn, 300, 'TXT', `"${txtArray.join(' ')}"`));
+        break;
+
+      case 'NS':
+        const nsRecords = await resolver.resolveNs(fqdn);
+        records = nsRecords.map(ns => formatRecord(fqdn, 300, 'NS', ns));
+        break;
+
+      case 'CNAME':
+        try {
+          const cnameRecords = await resolver.resolveCname(fqdn);
+          records = cnameRecords.map(cname => formatRecord(fqdn, 300, 'CNAME', cname));
+        } catch (e) {
+          records = [];
+        }
+        break;
+
+      case 'SOA':
+        try {
+          const soaRecord = await resolver.resolveSoa(fqdn);
+          if (soaRecord) {
+            records = [formatRecord(fqdn, 300, 'SOA',
+              `${soaRecord.nsname} ${soaRecord.hostmaster} ${soaRecord.serial} ${soaRecord.refresh} ${soaRecord.retry} ${soaRecord.expire} ${soaRecord.minttl}`)];
+          }
+        } catch (e) {
+          records = [];
+        }
+        break;
+    }
+    return records;
+  } catch (error) {
+    console.error(`Error resolving ${type} record for ${fqdn}:`, error);
+    return [];
+  }
+};
+
+const generateStats = (fqdn, server) => {
+  const id = Math.floor(Math.random() * 65535);
+  return [
+    formatRecord(';', '<<>>', 'DiG', `<<>> +stats @${server} ${fqdn}`),
+    formatRecord(';;', '->>HEADER<<-', 'QUERY,', `status: NOERROR, id: ${id}`),
+    formatRecord(';;', 'flags:', 'rd', 'ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1'),
+    formatRecord(';', 'EDNS:', '0,', 'flags:; udp: 512'),
+    formatRecord(';;', 'Query', 'time:', '5'),
+    formatRecord(';;', 'WHEN:', 'Mon', 'Dec'),
+    formatRecord(';;', 'MSG', 'SIZE', 'rcvd:')
+  ];
+};
+
+const resolveAllRecords = async (resolver, fqdn, server) => {
+  const recordTypes = ['SOA', 'NS', 'MX', 'AAAA', 'CNAME', 'A', 'TXT'];
+  const results = {};
+
+  await Promise.all(
+    recordTypes.map(async (type) => {
+      try {
+        results[type] = await resolveDNSRecord(resolver, fqdn, type);
+      } catch (err) {
+        console.error(`Failed to resolve ${type} records:`, err);
+        results[type] = [];
+      }
+    })
+  );
+
+  results.Stats = generateStats(fqdn, server);
+  return results;
+};
+
+app.post("/resolve", async (req, res) => {
   const { fqdn } = req.body;
 
   if (!fqdn || !/^[a-zA-Z0-9.-]+$/.test(fqdn)) {
     return res.status(400).json({ error: "Invalid or missing FQDN" });
   }
 
-  // Generate dig commands dynamically with escaped arguments
-  const generateCommands = (dnsServer) => ({
-    A: shellEscape(["dig", "+nocmd", "+noall", "+answer", `@${dnsServer}`, fqdn, "A"]),
-    AAAA: shellEscape(["dig", "+nocmd", "+noall", "+answer", `@${dnsServer}`, fqdn, "AAAA"]),
-    MX: shellEscape(["dig", "+nocmd", "+noall", "+answer", `@${dnsServer}`, fqdn, "MX"]),
-    TXT: shellEscape(["dig", "+nocmd", "+noall", "+answer", `@${dnsServer}`, fqdn, "TXT"]),
-    NS: shellEscape(["dig", "+nocmd", "+noall", "+answer", `@${dnsServer}`, fqdn, "NS"]),
-    CNAME: shellEscape(["dig", "+nocmd", "+noall", "+answer", `@${dnsServer}`, fqdn, "CNAME"]),
-    SOA: shellEscape(["dig", "+nocmd", "+noall", "+answer", `@${dnsServer}`, fqdn, "SOA"]),
-    Stats: shellEscape(["dig", "+stats", `@${dnsServer}`, fqdn]),
-  });
+  try {
+    const [internalResults, externalResults] = await Promise.all([
+      resolveAllRecords(internalResolver, fqdn, '192.168.1.1'),
+      resolveAllRecords(externalResolver, fqdn, '8.8.8.8')
+    ]);
 
-  const internalCommands = generateCommands("192.168.1.1");
-  const externalCommands = generateCommands("8.8.8.8");
-
-  const parseDigOutput = (output) => {
-    if (!output) return [];
-    return output
-      .split("\n")
-      .map((line) => {
-        const parts = line.trim().split(/\s+/);
-        if (parts.length >= 5) {
-          return {
-            name: parts[0],
-            ttl: parts[1],
-            class: parts[2],
-            type: parts[3],
-            value: parts.slice(4).join(" "),
-          };
-        }
-        return null;
-      })
-      .filter(Boolean);
-  };
-
-  const runCommand = (cmd, key) =>
-    new Promise((resolve) => {
-      exec(cmd, { timeout: 10000 }, (err, stdout, stderr) => {
-        if (err) {
-          console.error(`Error running command for ${key}:`, stderr || err.message);
-          resolve({ key, error: `Failed to resolve ${key}: ${stderr || err.message}` });
-        } else {
-          resolve({ key, data: parseDigOutput(stdout) });
-        }
-      });
+    res.json({
+      internal: internalResults,
+      external: externalResults
     });
-
-  const resolveDns = (commands) =>
-    Promise.all(
-      Object.entries(commands).map(([key, cmd]) => runCommand(cmd, key))
-    ).then((responses) => {
-      const results = {};
-      responses.forEach(({ key, data, error }) => {
-        results[key] = error ? { error } : data;
-      });
-      return results;
-    });
-
-  // Run both internal and external DNS resolutions
-  Promise.all([resolveDns(internalCommands), resolveDns(externalCommands)])
-    .then(([internalResults, externalResults]) => {
-      res.json({ internal: internalResults, external: externalResults });
-    })
-    .catch((err) => {
-      console.error("Error resolving DNS:", err.message);
-      res.status(500).json({ error: "Internal server error", details: err.message });
-    });
+  } catch (err) {
+    console.error("Error resolving DNS:", err);
+    res.status(500).json({ error: "Internal server error", details: err.message });
+  }
 });
 
 app.listen(5005, () => console.log("Server running on port 5005"));
