@@ -26,7 +26,7 @@ const FileUpload = ({ onFileUpload, error }) => {
       sx={{
         width: "100%",
         maxWidth: "800px",
-        textAlign: "center",
+        textAlign: "left",
         marginBottom: "20px",
       }}
     >

@@ -48,7 +48,7 @@ const App = () => {
     if (jsonData && newColumns) {
       setFqdnData(jsonData);
       setColumns(newColumns);
-      setSelectedColumn(newColumns[0]);
+      setSelectedColumn("FQDN"); // Always default to FQDN
 
       // Set initial visible columns
       const initialVisibleColumns = newColumns.filter(
@@ -61,7 +61,6 @@ const App = () => {
       setVisibleColumns(initialVisibleColumns);
     }
   };
-
 
   const handleResolve = async (fqdn) => {
     setResolvedFqdn(fqdn);

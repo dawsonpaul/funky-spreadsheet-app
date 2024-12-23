@@ -10,7 +10,7 @@ const Header = ({ themeMode, onThemeToggle }) => {
           color: themeMode === 'light' ? '#1976d2' : '#90caf9',
         }}
       >
-        FQDN Resolver
+        EIM to FQDN
       </Typography>
 
       <FormControlLabel

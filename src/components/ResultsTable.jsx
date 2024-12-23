@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useRef } from "react";
 import {
   Table,
   TableBody,
@@ -17,6 +17,44 @@ import EmailHoverMenu from "./EmailHoverMenu";
 
 const ROWS_PER_PAGE_OPTIONS = [10, 25, 50];
 
+const tableCellStyles = {
+  checkbox: {
+    width: "48px",
+    padding: "0 8px",
+  },
+  fqdn: {
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    width: "100px", // Changed from minWidth to width
+    position: "relative",
+    userSelect: "none",
+  },
+  standard: {
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    width: "77px",
+    position: "relative",
+    userSelect: "none",
+  },
+  action: {
+    width: "100px",
+    padding: "8px",
+  },
+  resizeHandle: {
+    position: "absolute",
+    right: 0,
+    top: 0,
+    height: "100%",
+    width: "4px",
+    cursor: "col-resize",
+    "&:hover": {
+      backgroundColor: "#90caf9",
+    },
+  },
+};
+
 const ResultsTable = ({
   columns,
   filteredData,
@@ -28,46 +66,76 @@ const ResultsTable = ({
   onCollect,
   onResolve,
 }) => {
-  const [page, setPage] = React.useState(0);
-  const [rowsPerPage, setRowsPerPage] = React.useState(
-    ROWS_PER_PAGE_OPTIONS[0]
-  );
-  const [copiedRow, setCopiedRow] = React.useState(null);
-  const [selectedRows, setSelectedRows] = React.useState([]);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(ROWS_PER_PAGE_OPTIONS[0]);
+  const [copiedRow, setCopiedRow] = useState(null);
+  const [selectedRows, setSelectedRows] = useState([]);
+  const [columnWidths, setColumnWidths] = useState({});
+  const resizingColumn = useRef(null);
+  const startX = useRef(null);
+  const startWidth = useRef(null);
 
-  // Get the data to display based on filters
+  const handleResizeStart = (e, columnId) => {
+    resizingColumn.current = columnId;
+    startX.current = e.pageX;
+    const currentWidth =
+      columnWidths[columnId] || (columnId === "FQDN" ? 300 : 200);
+    startWidth.current = currentWidth;
+
+    const handleResizeMove = (e) => {
+      if (resizingColumn.current) {
+        const diff = e.pageX - startX.current;
+        const newWidth = startWidth.current + diff; // Removed Math.max
+        setColumnWidths((prev) => ({
+          ...prev,
+          [resizingColumn.current]: newWidth,
+        }));
+      }
+    };
+
+    const handleResizeEnd = () => {
+      resizingColumn.current = null;
+      startX.current = null;
+      startWidth.current = null;
+      document.removeEventListener("mousemove", handleResizeMove);
+      document.removeEventListener("mouseup", handleResizeEnd);
+    };
+
+    document.addEventListener("mousemove", handleResizeMove);
+    document.addEventListener("mouseup", handleResizeEnd);
+  };
+
+  const getColumnStyle = (columnId) => {
+    const baseStyle =
+      columnId === "FQDN" ? tableCellStyles.fqdn : tableCellStyles.standard;
+
+    return {
+      ...baseStyle,
+      width: columnWidths[columnId] || baseStyle.width || baseStyle.minWidth,
+    };
+  };
+
   const displayData = resolvedFqdn
     ? filteredData.filter((row) => row.FQDN === resolvedFqdn)
     : showCollected
     ? filteredData.filter((row) => cart.some((item) => item.FQDN === row.FQDN))
     : filteredData;
 
-  // Calculate pagination
-  const totalRows = displayData.length;
-  const paginatedData = displayData.slice(
-    page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
-  );
-
   const handleSelectAllClick = (event) => {
-    const isChecked = event.target.checked;
-
-    if (isChecked) {
-      // When checking "select all"
-      const newSelected = displayData.map((row) => row.FQDN);
-      setSelectedRows(newSelected);
-      // Add all to cart that aren't already there
+    if (event.target.checked) {
+      const allFqdns = displayData.map((row) => row.FQDN);
+      setSelectedRows(allFqdns);
       displayData.forEach((row) => {
         if (!cart.some((item) => item.FQDN === row.FQDN)) {
           onCollect(row);
         }
       });
     } else {
-      // When unchecking "select all"
-      const currentSelected = displayData.filter((row) =>
-        selectedRows.includes(row.FQDN)
-      );
-      currentSelected.forEach((row) => onCollect(row)); // Remove all from cart
+      displayData.forEach((row) => {
+        if (cart.some((item) => item.FQDN === row.FQDN)) {
+          onCollect(row);
+        }
+      });
       setSelectedRows([]);
     }
   };
@@ -77,17 +145,23 @@ const ResultsTable = ({
     const fqdn = row.FQDN;
 
     if (isChecked) {
-      // When checking a row
-      setSelectedRows([...selectedRows, fqdn]);
-      if (!cart.some((item) => item.FQDN === row.FQDN)) {
-        onCollect(row); // Add to cart if not already there
+      setSelectedRows((prev) => [...prev, fqdn]);
+      if (!cart.some((item) => item.FQDN === fqdn)) {
+        onCollect(row);
       }
     } else {
-      // When unchecking a row
-      setSelectedRows(selectedRows.filter((id) => id !== fqdn));
-      onCollect(row); // Remove from cart
+      setSelectedRows((prev) => prev.filter((id) => id !== fqdn));
+      if (cart.some((item) => item.FQDN === fqdn)) {
+        onCollect(row);
+      }
     }
   };
+
+  const totalRows = displayData.length;
+  const paginatedData = displayData.slice(
+    page * rowsPerPage,
+    page * rowsPerPage + rowsPerPage
+  );
 
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
@@ -121,9 +195,21 @@ const ResultsTable = ({
   }
 
   return (
-    <Box sx={{ width: "100%" }}>
+    <Box
+      sx={{
+        width: "100%",
+        overflowX: "auto",
+        "& .MuiTable-root": {
+          minWidth: "max-content",
+        },
+      }}
+    >
       <Box sx={{ mb: 2 }}>
-        <Typography>
+        <Typography
+          sx={{
+            color: themeMode === "light" ? "text.primary" : "#90caf9",
+          }}
+        >
           Showing {paginatedData.length} of {totalRows} results
         </Typography>
       </Box>
@@ -131,7 +217,7 @@ const ResultsTable = ({
       <Table>
         <TableHead>
           <TableRow>
-            <TableCell padding="checkbox">
+            <TableCell padding="checkbox" sx={tableCellStyles.checkbox}>
               <Checkbox
                 color="primary"
                 indeterminate={
@@ -145,57 +231,41 @@ const ResultsTable = ({
                 onChange={handleSelectAllClick}
               />
             </TableCell>
-            <TableCell>FQDN</TableCell>
-            <TableCell>Collection</TableCell>
-            <TableCell>DNS Query</TableCell>
-            <TableCell>Copy</TableCell>
+            <TableCell sx={getColumnStyle("FQDN")}>
+              FQDN
+              <div
+                style={tableCellStyles.resizeHandle}
+                onMouseDown={(e) => handleResizeStart(e, "FQDN")}
+              />
+            </TableCell>
+            <TableCell sx={tableCellStyles.action}>DNS Query</TableCell>
+            <TableCell sx={tableCellStyles.action}>Copy</TableCell>
             {columns
               .filter((col) => col !== "FQDN")
-              .map((col, index) => (
-                <TableCell key={index}>{col}</TableCell>
+              .map((col) => (
+                <TableCell key={col} sx={getColumnStyle(col)}>
+                  {col}
+                  <div
+                    style={tableCellStyles.resizeHandle}
+                    onMouseDown={(e) => handleResizeStart(e, col)}
+                  />
+                </TableCell>
               ))}
           </TableRow>
         </TableHead>
 
         <TableBody>
           {paginatedData.map((row, rowIndex) => (
-            <TableRow key={rowIndex} selected={selectedRows.includes(row.FQDN)}>
-              <TableCell padding="checkbox">
+            <TableRow key={rowIndex}>
+              <TableCell padding="checkbox" sx={tableCellStyles.checkbox}>
                 <Checkbox
                   color="primary"
                   checked={selectedRows.includes(row.FQDN)}
                   onChange={(event) => handleSelectRow(event, row)}
                 />
               </TableCell>
-              <TableCell>{row.FQDN}</TableCell>
-
-              <TableCell>
-                <Button
-                  variant="contained"
-                  size="small"
-                  onClick={() => onCollect(row)}
-                  sx={{
-                    backgroundColor: cart.some((item) => item.FQDN === row.FQDN)
-                      ? themeMode === "light"
-                        ? "#bbdefb"
-                        : "#0d47a1"
-                      : themeMode === "light"
-                      ? "#1976d2"
-                      : "#90caf9",
-                    color: cart.some((item) => item.FQDN === row.FQDN)
-                      ? themeMode === "light"
-                        ? "#000"
-                        : "#fff"
-                      : "#fff",
-                  }}
-                >
-                  {cart.some((item) => item.FQDN === row.FQDN)
-                    ? "Remove"
-                    : "Collect"}
-                </Button>
-              </TableCell>
-
-              <TableCell>
+              <TableCell sx={getColumnStyle("FQDN")}>{row.FQDN}</TableCell>
+              <TableCell sx={tableCellStyles.action}>
                 <Button
                   variant="contained"
                   size="small"
@@ -225,8 +295,7 @@ const ResultsTable = ({
                   )}
                 </Button>
               </TableCell>
-
-              <TableCell>
+              <TableCell sx={tableCellStyles.action}>
                 <Tooltip
                   title={copiedRow === row.FQDN ? "Copied!" : "Copy row"}
                 >
@@ -250,11 +319,10 @@ const ResultsTable = ({
                   </Button>
                 </Tooltip>
               </TableCell>
-
               {columns
                 .filter((col) => col !== "FQDN")
                 .map((col, colIndex) => (
-                  <TableCell key={colIndex}>
+                  <TableCell key={colIndex} sx={getColumnStyle(col)}>
                     {col.toLowerCase().includes("email") ? (
                       <EmailHoverMenu email={row[col]} />
                     ) : (

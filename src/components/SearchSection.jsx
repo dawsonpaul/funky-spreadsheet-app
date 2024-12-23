@@ -1,6 +1,5 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 import { Box, FormControl, InputLabel, Select, MenuItem, TextField } from '@mui/material';
-import _ from 'lodash';
 
 const SearchSection = ({
   columns,
@@ -9,20 +8,12 @@ const SearchSection = ({
   onColumnChange,
   onSearchTermChange
 }) => {
-  // Debounce the search to prevent excessive filtering
-  const debouncedSearch = useCallback(
-    _.debounce((value) => {
-      onSearchTermChange(value);
-    }, 300),
-    [onSearchTermChange]
-  );
-
-  const handleSearchChange = (e) => {
-    // Update the input value immediately for UI responsiveness
-    e.persist();
-    // Debounce the actual search
-    debouncedSearch(e.target.value);
-  };
+  // Sort columns to prioritize FQDN and APPID
+  const sortedColumns = React.useMemo(() => {
+    const priorityColumns = ['FQDN', 'APPID'];
+    const otherColumns = columns.filter(col => !priorityColumns.includes(col));
+    return [...priorityColumns, ...otherColumns];
+  }, [columns]);
 
   return (
     <Box sx={{
@@ -37,11 +28,17 @@ const SearchSection = ({
         <Select
           labelId="search-column-label"
           label="Search By Column"
-          value={selectedColumn}
+          value={selectedColumn || 'FQDN'}  // Default to FQDN if no selection
           onChange={(e) => onColumnChange(e.target.value)}
         >
-          {columns.map((col) => (
-            <MenuItem key={col} value={col}>
+          {sortedColumns.map((col) => (
+            <MenuItem 
+              key={col} 
+              value={col}
+              sx={{
+                fontWeight: (col === 'FQDN' || col === 'APPID') ? 'bold' : 'normal'
+              }}
+            >
               {col}
             </MenuItem>
           ))}
@@ -49,8 +46,9 @@ const SearchSection = ({
       </FormControl>
       <TextField
         sx={{ flex: 2 }}
-        placeholder="Enter search term (minimum 3 characters)"
-        onChange={handleSearchChange}
+        placeholder="Enter search term"
+        value={searchTerm}
+        onChange={(e) => onSearchTermChange(e.target.value)}
       />
     </Box>
   );
