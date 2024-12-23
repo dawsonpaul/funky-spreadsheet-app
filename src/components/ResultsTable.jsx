@@ -24,22 +24,15 @@ const tableCellStyles = {
   },
   fqdn: {
     whiteSpace: "nowrap",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    width: "100px", // Changed from minWidth to width
     position: "relative",
-    userSelect: "none",
+    userSelect: "text",
   },
   standard: {
     whiteSpace: "nowrap",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    width: "77px",
     position: "relative",
-    userSelect: "none",
+    userSelect: "text",
   },
   action: {
-    width: "100px",
     padding: "8px",
   },
   resizeHandle: {
@@ -85,7 +78,7 @@ const ResultsTable = ({
     const handleResizeMove = (e) => {
       if (resizingColumn.current) {
         const diff = e.pageX - startX.current;
-        const newWidth = startWidth.current + diff; // Removed Math.max
+        const newWidth = Math.max(startWidth.current + diff, 50); // Minimum 50px
         setColumnWidths((prev) => ({
           ...prev,
           [resizingColumn.current]: newWidth,
@@ -214,7 +207,13 @@ const ResultsTable = ({
         </Typography>
       </Box>
 
-      <Table>
+      <Table
+        sx={{
+          minWidth: "100%",
+          overflowX: "auto",
+          tableLayout: "auto", // Dynamic column sizing
+        }}
+      >
         <TableHead>
           <TableRow>
             <TableCell padding="checkbox" sx={tableCellStyles.checkbox}>
