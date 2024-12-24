@@ -9,20 +9,22 @@ const DnsResults = ({
   onRecordTabChange,
 }) => {
   const [validRecordTypes, setValidRecordTypes] = useState([]);
+  const recordOrder = ["A", "AAAA", "CNAME", "MX", "TXT", "NS", "SOA"];
 
   // Debug to log received resolveResults
   useEffect(() => {
     console.log("resolveResults received by DnsResults:", resolveResults);
   }, [resolveResults]);
 
-  // Determine valid record types based on resolveResults
+  // Determine valid record types and sort them
   useEffect(() => {
     if (resolveResults && resolveResults[activeTab]) {
-      const types = Object.keys(resolveResults[activeTab]).filter((type) => {
-        const records = resolveResults[activeTab][type];
-        // Include all arrays even if they are empty
-        return type !== "Stats" && Array.isArray(records);
-      });
+      const types = Object.keys(resolveResults[activeTab])
+        .filter((type) => {
+          const records = resolveResults[activeTab][type];
+          return type !== "Stats" && Array.isArray(records);
+        })
+        .sort((a, b) => recordOrder.indexOf(a) - recordOrder.indexOf(b)); // Sort based on preferred order
 
       setValidRecordTypes(types);
 
@@ -80,11 +82,7 @@ const DnsResults = ({
   };
 
   if (!resolveResults) {
-    return (
-      <Typography sx={{ marginTop: "20px" }}>
-        No data available. Please resolve an FQDN.
-      </Typography>
-    );
+    return <Typography sx={{ marginTop: "20px" }}></Typography>;
   }
 
   return (
@@ -115,7 +113,13 @@ const DnsResults = ({
                 sx={{ marginTop: "20px" }}
               >
                 {validRecordTypes.map((recordType) => (
-                  <Tab key={recordType} label={recordType} value={recordType} />
+                  <Tab
+                    key={recordType}
+                    label={`${recordType} (${
+                      resolveResults[activeTab][recordType]?.length || 0
+                    })`}
+                    value={recordType}
+                  />
                 ))}
               </Tabs>
 

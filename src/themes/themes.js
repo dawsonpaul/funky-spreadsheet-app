@@ -97,7 +97,7 @@ const createMd3Theme = (mode) => {
           root: {
             borderRadius: '20px',
             textTransform: 'none',
-            padding: '8px 24px',
+            padding: '2px 10px',
             fontWeight: 500,
           },
           contained: {

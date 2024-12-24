@@ -55,9 +55,12 @@ const ResultsTable = ({
   showCollected,
   cart,
   loadingFqdn,
+  loadingCert,
   themeMode,
   onCollect,
   onResolve,
+  onFetchCert,
+  certFqdn,
 }) => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(ROWS_PER_PAGE_OPTIONS[0]);
@@ -67,6 +70,7 @@ const ResultsTable = ({
   const resizingColumn = useRef(null);
   const startX = useRef(null);
   const startWidth = useRef(null);
+  const [columnFilters, setColumnFilters] = useState({});
 
   const handleResizeStart = (e, columnId) => {
     resizingColumn.current = columnId;
@@ -108,11 +112,26 @@ const ResultsTable = ({
     };
   };
 
-  const displayData = resolvedFqdn
-    ? filteredData.filter((row) => row.FQDN === resolvedFqdn)
-    : showCollected
-    ? filteredData.filter((row) => cart.some((item) => item.FQDN === row.FQDN))
-    : filteredData;
+  const displayData = filteredData
+    .filter((row) => {
+      // Apply column filters
+      return Object.keys(columnFilters).every((col) =>
+        row[col]
+          ?.toString()
+          .toLowerCase()
+          .includes(columnFilters[col].toLowerCase())
+      );
+    })
+    .filter((row) => {
+      // Apply resolvedFqdn or certFqdn filter if set
+      if (resolvedFqdn) return row.FQDN === resolvedFqdn;
+      if (certFqdn) return row.FQDN === certFqdn;
+      return true;
+    })
+    .filter((row) => {
+      // Apply cart filter if showing collected rows
+      return !showCollected || cart.some((item) => item.FQDN === row.FQDN);
+    });
 
   const handleSelectAllClick = (event) => {
     if (event.target.checked) {
@@ -183,6 +202,17 @@ const ResultsTable = ({
     return (
       <Box sx={{ textAlign: "center", mt: 2 }}>
         <Typography>No results found.</Typography>
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={() => {
+            setColumnFilters({}); // Reset all filters
+            setPage(0); // Reset pagination to the first page
+          }}
+          sx={{ mt: 2 }}
+        >
+          Reset Filters
+        </Button>
       </Box>
     );
   }
@@ -215,7 +245,8 @@ const ResultsTable = ({
         }}
       >
         <TableHead>
-          <TableRow>
+          {/* Headers Row */}
+          <TableRow >
             <TableCell padding="checkbox" sx={tableCellStyles.checkbox}>
               <Checkbox
                 color="primary"
@@ -237,10 +268,18 @@ const ResultsTable = ({
                 onMouseDown={(e) => handleResizeStart(e, "FQDN")}
               />
             </TableCell>
+            <TableCell sx={getColumnStyle("APPID")}>
+              APPID
+              <div
+                style={tableCellStyles.resizeHandle}
+                onMouseDown={(e) => handleResizeStart(e, "APPID")}
+              />
+            </TableCell>
             <TableCell sx={tableCellStyles.action}>DNS Query</TableCell>
+            <TableCell sx={tableCellStyles.action}>Get Cert</TableCell>
             <TableCell sx={tableCellStyles.action}>Copy</TableCell>
             {columns
-              .filter((col) => col !== "FQDN")
+              .filter((col) => col !== "FQDN" && col !== "APPID")
               .map((col) => (
                 <TableCell key={col} sx={getColumnStyle(col)}>
                   {col}
@@ -251,11 +290,81 @@ const ResultsTable = ({
                 </TableCell>
               ))}
           </TableRow>
+
+          {/* Filters Row */}
+          <TableRow >
+            <TableCell
+              padding="checkbox"
+              sx={tableCellStyles.checkbox}
+            ></TableCell>
+            <TableCell sx={getColumnStyle("FQDN")}>
+              <input
+                type="text"
+                placeholder="Filter FQDN"
+                value={columnFilters["FQDN"] || ""}
+                onChange={(e) =>
+                  setColumnFilters((prev) => ({
+                    ...prev,
+                    FQDN: e.target.value,
+                  }))
+                }
+                style={{
+                  width: "70%",
+                  padding: "1px",
+                  boxSizing: "border-box",
+                }}
+              />
+            </TableCell>
+            <TableCell sx={getColumnStyle("APPID")}>
+              <input
+                type="text"
+                placeholder="Filter APPID"
+                value={columnFilters["APPID"] || ""}
+                onChange={(e) =>
+                  setColumnFilters((prev) => ({
+                    ...prev,
+                    APPID: e.target.value,
+                  }))
+                }
+                style={{
+                  width: "70%",
+                  padding: "2px",
+                  boxSizing: "border-box",
+                }}
+              />
+            </TableCell>
+            <TableCell sx={tableCellStyles.action}></TableCell>
+            <TableCell sx={tableCellStyles.action}></TableCell>
+            <TableCell sx={tableCellStyles.action}></TableCell>
+            {columns
+              .filter((col) => col !== "FQDN" && col !== "APPID")
+              .map((col) => (
+                <TableCell key={col} sx={getColumnStyle(col)}>
+                  <input
+                    type="text"
+                    placeholder={`Filter ${col}`}
+                    value={columnFilters[col] || ""}
+                    onChange={(e) =>
+                      setColumnFilters((prev) => ({
+                        ...prev,
+                        [col]: e.target.value,
+                      }))
+                    }
+                    style={{
+                      width: "70%",
+                      padding: "2px",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                </TableCell>
+              ))}
+          </TableRow>
         </TableHead>
 
         <TableBody>
           {paginatedData.map((row, rowIndex) => (
             <TableRow key={rowIndex}>
+              {/* Checkbox for Row Selection */}
               <TableCell padding="checkbox" sx={tableCellStyles.checkbox}>
                 <Checkbox
                   color="primary"
@@ -263,7 +372,11 @@ const ResultsTable = ({
                   onChange={(event) => handleSelectRow(event, row)}
                 />
               </TableCell>
+              {/* Fixed FQDN Column */}
               <TableCell sx={getColumnStyle("FQDN")}>{row.FQDN}</TableCell>
+              {/* Fixed APPID Column */}
+              <TableCell sx={getColumnStyle("APPID")}>{row.APPID}</TableCell>
+              {/* DNS Query Action */}
               <TableCell sx={tableCellStyles.action}>
                 <Button
                   variant="contained"
@@ -279,12 +392,7 @@ const ResultsTable = ({
                         : themeMode === "light"
                         ? "#1976d2"
                         : "#90caf9",
-                    color:
-                      loadingFqdn === row.FQDN
-                        ? themeMode === "light"
-                          ? "#000"
-                          : "#fff"
-                        : "#fff",
+                    color: themeMode === "dark" ? "#000" : "#fff", // Black text in dark mode
                   }}
                 >
                   {loadingFqdn === row.FQDN ? (
@@ -294,6 +402,33 @@ const ResultsTable = ({
                   )}
                 </Button>
               </TableCell>
+              {/* Get Certificate Action */}
+              <TableCell sx={tableCellStyles.action}>
+                <Button
+                  variant="contained"
+                  size="small"
+                  onClick={() => onFetchCert(row.FQDN)}
+                  disabled={loadingCert === row.FQDN}
+                  sx={{
+                    backgroundColor:
+                      loadingCert === row.FQDN
+                        ? themeMode === "light"
+                          ? "#e0e0e0"
+                          : "#424242"
+                        : themeMode === "light"
+                        ? "#1976d2"
+                        : "#90caf9",
+                    color: themeMode === "dark" ? "#000" : "#fff", // Black text in dark mode
+                  }}
+                >
+                  {loadingCert === row.FQDN ? (
+                    <CircularProgress size={20} color="inherit" />
+                  ) : (
+                    "Get Cert"
+                  )}
+                </Button>
+              </TableCell>
+              {/* Copy Action */}
               <TableCell sx={tableCellStyles.action}>
                 <Tooltip
                   title={copiedRow === row.FQDN ? "Copied!" : "Copy row"}
@@ -318,8 +453,9 @@ const ResultsTable = ({
                   </Button>
                 </Tooltip>
               </TableCell>
+              {/* Dynamic Columns */}
               {columns
-                .filter((col) => col !== "FQDN")
+                .filter((col) => col !== "FQDN" && col !== "APPID")
                 .map((col, colIndex) => (
                   <TableCell key={colIndex} sx={getColumnStyle(col)}>
                     {col.toLowerCase().includes("email") ? (

@@ -7,7 +7,6 @@ import {
   CircularProgress,
 } from "@mui/material";
 import { lightTheme, darkTheme } from "./themes/themes.js";
-import { resolveFqdn } from "./utils/dnsHelpers";
 import Header from "./components/Header";
 import CartBox from "./components/CartBox";
 import FileUpload from "./components/FileUpload";
@@ -15,9 +14,10 @@ import SearchSection from "./components/SearchSection";
 import ResultsTable from "./components/ResultsTable";
 import DnsResults from "./components/DnsResults";
 import ColumnManager from "./components/ColumnManager";
+import CertResults from "./components/CertResults.jsx";
 import { handleFileRead } from "./utils/fileHandlers";
 
-const DEFAULT_FILE_PATH = "../dummy_data_200_rows.xlsx";
+const DEFAULT_FILE_PATH = "../example.xlsx";
 
 const App = () => {
   const [themeMode, setThemeMode] = useState("light");
@@ -27,19 +27,21 @@ const App = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [resolveResults, setResolveResults] = useState(null);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false); // Added for progress bar
+  const [loading, setLoading] = useState(false); // Progress bar
   const [activeTab, setActiveTab] = useState("internal");
   const [activeRecordTab, setActiveRecordTab] = useState("A");
   const [cart, setCart] = useState([]);
-  const [resolvedFqdn, setResolvedFqdn] = useState(null);
   const [showCollected, setShowCollected] = useState(false);
   const [loadingFqdn, setLoadingFqdn] = useState("");
   const [visibleColumns, setVisibleColumns] = useState([]);
-  const [selectedRows, setSelectedRows] = useState([]);
+  const [certResults, setCertResults] = useState(null);
+  const [loadingCert, setLoadingCert] = useState("");
+  const [resolvedFqdn, setResolvedFqdn] = useState(null); // For DNS Resolve
+  const [certFqdn, setCertFqdn] = useState(null); // For Get Cert
 
   // Load default data on mount
   useEffect(() => {
-    setLoading(true); // Ensure loader is immediately visible
+    setLoading(true);
     fetch(DEFAULT_FILE_PATH)
       .then((response) => response.blob())
       .then((blob) => {
@@ -50,7 +52,7 @@ const App = () => {
             (jsonData, newColumns) => {
               setFqdnData(jsonData);
               setColumns(newColumns);
-              setSelectedColumn("FQDN"); // Ensure FQDN is selected by default
+              setSelectedColumn("FQDN");
               setVisibleColumns(
                 newColumns.filter(
                   (col) =>
@@ -60,11 +62,11 @@ const App = () => {
                     col.toLowerCase().includes("email")
                 )
               );
-              setLoading(false); // Stop loading after data is processed
+              setLoading(false);
             },
             (err) => {
               setError(err);
-              setLoading(false); // Stop loading even on error
+              setLoading(false);
             }
           );
         };
@@ -72,7 +74,7 @@ const App = () => {
       })
       .catch(() => {
         setError("Failed to load the default file.");
-        setLoading(false); // Stop loading even on fetch failure
+        setLoading(false);
       });
   }, []);
 
@@ -96,8 +98,7 @@ const App = () => {
     if (jsonData && newColumns) {
       setFqdnData(jsonData);
       setColumns(newColumns);
-      setSelectedColumn("FQDN"); // Ensure FQDN is selected by default
-
+      setSelectedColumn("FQDN");
       const initialVisibleColumns = newColumns.filter(
         (col) =>
           col === "FQDN" ||
@@ -110,8 +111,10 @@ const App = () => {
   };
 
   const handleResolve = async (fqdn) => {
-    setResolvedFqdn(fqdn);
-    setLoadingFqdn(fqdn);
+    setResolvedFqdn(fqdn); // Set resolved FQDN
+    setCertFqdn(null); // Reset certFqdn when resolving
+    setCertResults(null); // Clear cert results
+    setLoadingFqdn(fqdn); // Show loading spinner for this FQDN
     try {
       const response = await fetch("http://localhost:5005/resolve", {
         method: "POST",
@@ -120,13 +123,43 @@ const App = () => {
       });
       const data = await response.json();
 
-      console.log("Raw DNS Response:", data); // Ensure full response is logged
-      setResolveResults(data); // Set the complete response
-      console.log("Updated resolveResults:", data); // Log the updated state
-      setLoadingFqdn("");
+      // Set resolve results
+      setResolveResults(data);
     } catch (error) {
       console.error("Error resolving DNS:", error);
-      setLoadingFqdn("");
+      setResolveResults(null);
+    } finally {
+      setLoadingFqdn(""); // Reset loading state
+    }
+  };
+
+  const handleFetchCert = async (fqdn) => {
+    setCertFqdn(fqdn); // Set cert FQDN
+    setResolvedFqdn(null); // Reset resolvedFqdn when fetching cert
+    setResolveResults(null); // Clear resolve results
+    setLoadingCert(fqdn); // Show loading spinner for this FQDN
+    const timeout = 10000; // Timeout in milliseconds (10 seconds)
+
+    try {
+      const response = await Promise.race([
+        fetch(`http://localhost:5005/getCertificate?domain=${fqdn}`),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Request timed out")), timeout)
+        ),
+      ]);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch certificate: ${response.statusText}`);
+      }
+
+      const certData = await response.json();
+      console.log("Certificate fetched:", certData);
+      setCertResults(certData); // Update state with fetched certificate
+    } catch (error) {
+      console.error("Error fetching certificate:", error.message);
+      setCertResults({ error: error.message }); // Display error message in certResults
+    } finally {
+      setLoadingCert(""); // Reset loading state
     }
   };
 
@@ -141,6 +174,10 @@ const App = () => {
     });
   };
 
+  useEffect(() => {
+    console.log("Updated visibleColumns:", visibleColumns);
+  }, [visibleColumns]);
+
   const handleSearchTermChange = (value) => {
     setSearchTerm(value);
     setResolveResults(null);
@@ -148,7 +185,6 @@ const App = () => {
 
   const filteredData = useMemo(() => {
     if (searchTerm.length < 3) return [];
-
     return fqdnData.filter((row) => {
       if (!selectedColumn || !row[selectedColumn]) return false;
       const value = row[selectedColumn].toString().toLowerCase();
@@ -169,11 +205,10 @@ const App = () => {
           padding: "20px",
         }}
       >
-        {loading ? ( // Show progress bar while loading
+        {loading ? (
           <Box
             sx={{
               display: "flex",
-              flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
               position: "absolute",
@@ -187,19 +222,18 @@ const App = () => {
           >
             <CircularProgress />
             <Typography sx={{ marginTop: "10px" }}>
-              Loading FQDN and EIM data ...
+              Loading FQDN and EIM data...
             </Typography>
           </Box>
         ) : (
-          <Box sx={{ maxWidth: "1200px", width: "100%", margin: "0 auto" }}>
+          <Box sx={{ maxWidth: "1600px", width: "100%", margin: "0 auto" }}>
             <CartBox
               cart={cart}
               themeMode={themeMode}
               onShowCollected={() => setShowCollected((prev) => !prev)}
+              onSearchTermChange={handleSearchTermChange}
             />
-
             <Header themeMode={themeMode} onThemeToggle={handleThemeToggle} />
-
             <FileUpload onFileUpload={handleFileUpload} error={error} />
 
             {fqdnData.length > 0 && (
@@ -209,7 +243,7 @@ const App = () => {
                   selectedColumn={selectedColumn}
                   searchTerm={searchTerm}
                   onColumnChange={setSelectedColumn}
-                  onSearchTermChange={handleSearchTermChange}
+                  onSearchTermChange={setSearchTerm}
                 />
 
                 <ColumnManager
@@ -219,31 +253,48 @@ const App = () => {
                   defaultColumns={defaultColumns}
                 />
 
-                {resolvedFqdn && (
-                  <Button
-                    variant="outlined"
-                    onClick={() => {
-                      setResolvedFqdn(null);
-                      setResolveResults(null);
-                      setLoadingFqdn("");
-                    }}
-                    sx={{ mb: 2 }}
-                  >
-                    Reset
-                  </Button>
-                )}
-
                 <ResultsTable
+                  visibleColumns={visibleColumns}
                   columns={visibleColumns}
                   filteredData={filteredData}
                   resolvedFqdn={resolvedFqdn}
                   showCollected={showCollected}
                   cart={cart}
                   loadingFqdn={loadingFqdn}
+                  loadingCert={loadingCert}
                   themeMode={themeMode}
-                  onCollect={handleCollect}
                   onResolve={handleResolve}
+                  onFetchCert={handleFetchCert}
+                  onCollect={handleCollect}
+                  certFqdn={certFqdn}
                 />
+
+                {resolvedFqdn && (
+                  <Button
+                    variant="outlined"
+                    onClick={() => {
+                      setResolvedFqdn(null); // Clear DNS Resolve state
+                      setResolveResults(null);
+                      setLoadingFqdn("");
+                    }}
+                    sx={{ mb: 2 }}
+                  >
+                    Reset FQDN
+                  </Button>
+                )}
+
+                {certFqdn && (
+                  <Button
+                    variant="outlined"
+                    onClick={() => {
+                      setCertFqdn(null); // Clear Cert state
+                      setCertResults(null);
+                    }}
+                    sx={{ mb: 2, alignSelf: "center" }}
+                  >
+                    Reset Cert
+                  </Button>
+                )}
               </Box>
             )}
 
@@ -253,6 +304,11 @@ const App = () => {
               activeRecordTab={activeRecordTab}
               onTabChange={setActiveTab}
               onRecordTabChange={setActiveRecordTab}
+            />
+
+            <CertResults
+              certResults={certResults}
+              onClose={() => setCertResults(null)}
             />
           </Box>
         )}
