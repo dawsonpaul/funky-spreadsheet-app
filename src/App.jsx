@@ -166,10 +166,10 @@ const App = () => {
   const handleCollect = (row) => {
     setCart((prevCart) => {
       const isAlreadyCollected = prevCart.some(
-        (item) => item.FQDN === row.FQDN
+        (item) => item.uniqueId === row.uniqueId
       );
       return isAlreadyCollected
-        ? prevCart.filter((item) => item.FQDN !== row.FQDN)
+        ? prevCart.filter((item) => item.uniqueId !== row.uniqueId)
         : [...prevCart, row];
     });
   };
@@ -269,32 +269,39 @@ const App = () => {
                   certFqdn={certFqdn}
                 />
 
-                {resolvedFqdn && (
-                  <Button
-                    variant="outlined"
-                    onClick={() => {
-                      setResolvedFqdn(null); // Clear DNS Resolve state
-                      setResolveResults(null);
-                      setLoadingFqdn("");
-                    }}
-                    sx={{ mb: 2 }}
-                  >
-                    Reset FQDN
-                  </Button>
-                )}
+                <Box
+                  sx={{
+                    mt: 3,
+                    display: "flex",
+                    justifyContent: "center",
+                    gap: "20px",
+                  }}
+                >
+                  {resolvedFqdn && (
+                    <Button
+                      variant="outlined"
+                      onClick={() => {
+                        setResolvedFqdn(null); // Clear DNS Resolve state
+                        setResolveResults(null);
+                        setLoadingFqdn("");
+                      }}
+                    >
+                      Reset FQDN
+                    </Button>
+                  )}
 
-                {certFqdn && (
-                  <Button
-                    variant="outlined"
-                    onClick={() => {
-                      setCertFqdn(null); // Clear Cert state
-                      setCertResults(null);
-                    }}
-                    sx={{ mb: 2, alignSelf: "center" }}
-                  >
-                    Reset Cert
-                  </Button>
-                )}
+                  {certFqdn && (
+                    <Button
+                      variant="outlined"
+                      onClick={() => {
+                        setCertFqdn(null); // Clear Cert state
+                        setCertResults(null);
+                      }}
+                    >
+                      Reset Cert
+                    </Button>
+                  )}
+                </Box>
               </Box>
             )}
 

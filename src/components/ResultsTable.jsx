@@ -31,6 +31,7 @@ const tableCellStyles = {
     whiteSpace: "nowrap",
     position: "relative",
     userSelect: "text",
+    padding: "0 8px",
   },
   action: {
     padding: "8px",
@@ -46,6 +47,10 @@ const tableCellStyles = {
       backgroundColor: "#90caf9",
     },
   },
+};
+
+const createUniqueId = (row, index) => {
+  return `${row.FQDN}_${index}`;
 };
 
 const ResultsTable = ({
@@ -131,41 +136,53 @@ const ResultsTable = ({
     .filter((row) => {
       // Apply cart filter if showing collected rows
       return !showCollected || cart.some((item) => item.FQDN === row.FQDN);
-    });
+    })
+    .map((row, index) => ({
+      ...row,
+      uniqueId: createUniqueId(row, index),
+    }));
 
   const handleSelectAllClick = (event) => {
     if (event.target.checked) {
-      const allFqdns = displayData.map((row) => row.FQDN);
-      setSelectedRows(allFqdns);
-      displayData.forEach((row) => {
-        if (!cart.some((item) => item.FQDN === row.FQDN)) {
+      // Add all unique IDs from the paginated data to the selected rows
+      const pageUniqueIds = paginatedData.map((row) => row.uniqueId);
+      setSelectedRows((prev) => [...new Set([...prev, ...pageUniqueIds])]);
+
+      // Add all paginated rows to the cart
+      paginatedData.forEach((row) => {
+        if (!cart.some((item) => item.uniqueId === row.uniqueId)) {
           onCollect(row);
         }
       });
     } else {
-      displayData.forEach((row) => {
-        if (cart.some((item) => item.FQDN === row.FQDN)) {
+      // Remove all paginated rows from the selected rows
+      const pageUniqueIds = paginatedData.map((row) => row.uniqueId);
+      setSelectedRows((prev) =>
+        prev.filter((id) => !pageUniqueIds.includes(id))
+      );
+
+      // Remove all paginated rows from the cart
+      paginatedData.forEach((row) => {
+        if (cart.some((item) => item.uniqueId === row.uniqueId)) {
           onCollect(row);
         }
       });
-      setSelectedRows([]);
     }
   };
 
   const handleSelectRow = (event, row) => {
     const isChecked = event.target.checked;
-    const fqdn = row.FQDN;
 
     if (isChecked) {
-      setSelectedRows((prev) => [...prev, fqdn]);
-      if (!cart.some((item) => item.FQDN === fqdn)) {
+      // Add the row to the selected state and cart if it's not already there
+      if (!selectedRows.includes(row.uniqueId)) {
+        setSelectedRows((prev) => [...prev, row.uniqueId]);
         onCollect(row);
       }
     } else {
-      setSelectedRows((prev) => prev.filter((id) => id !== fqdn));
-      if (cart.some((item) => item.FQDN === fqdn)) {
-        onCollect(row);
-      }
+      // Remove the row from the selected state and cart
+      setSelectedRows((prev) => prev.filter((id) => id !== row.uniqueId));
+      onCollect(row, true); // Pass a flag indicating removal
     }
   };
 
@@ -227,14 +244,44 @@ const ResultsTable = ({
         },
       }}
     >
-      <Box sx={{ mb: 2 }}>
+      {/* Pagination and Results Count */}
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between", // Align text and pagination on the same line
+          alignItems: "center", // Vertically align them
+          mb: 2, // Add space below
+        }}
+      >
+        {/* Showing X of X Results */}
         <Typography
           sx={{
+            fontSize: "0.9rem", // Ensure consistent font size
             color: themeMode === "light" ? "text.primary" : "#90caf9",
           }}
         >
           Showing {paginatedData.length} of {totalRows} results
         </Typography>
+
+        {/* Pagination Controls */}
+        <TablePagination
+          component="div"
+          count={totalRows}
+          page={page}
+          onPageChange={handleChangePage}
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+          rowsPerPageOptions={ROWS_PER_PAGE_OPTIONS}
+          sx={{
+            "& .MuiTablePagination-toolbar": {
+              padding: 0, // Remove default padding
+              minHeight: "36px", // Match height with Typography
+            },
+            "& .MuiTablePagination-selectLabel, .MuiTablePagination-input": {
+              fontSize: "0.9rem", // Match Typography font size
+            },
+          }}
+        />
       </Box>
 
       <Table
@@ -246,17 +293,23 @@ const ResultsTable = ({
       >
         <TableHead>
           {/* Headers Row */}
-          <TableRow >
+          <TableRow>
             <TableCell padding="checkbox" sx={tableCellStyles.checkbox}>
               <Checkbox
                 color="primary"
                 indeterminate={
-                  selectedRows.length > 0 &&
-                  selectedRows.length < displayData.length
+                  paginatedData.some((row) =>
+                    selectedRows.includes(row.uniqueId)
+                  ) &&
+                  !paginatedData.every((row) =>
+                    selectedRows.includes(row.uniqueId)
+                  )
                 }
                 checked={
-                  displayData.length > 0 &&
-                  selectedRows.length === displayData.length
+                  paginatedData.length > 0 &&
+                  paginatedData.every((row) =>
+                    selectedRows.includes(row.uniqueId)
+                  )
                 }
                 onChange={handleSelectAllClick}
               />
@@ -292,7 +345,7 @@ const ResultsTable = ({
           </TableRow>
 
           {/* Filters Row */}
-          <TableRow >
+          <TableRow>
             <TableCell
               padding="checkbox"
               sx={tableCellStyles.checkbox}
@@ -368,7 +421,7 @@ const ResultsTable = ({
               <TableCell padding="checkbox" sx={tableCellStyles.checkbox}>
                 <Checkbox
                   color="primary"
-                  checked={selectedRows.includes(row.FQDN)}
+                  checked={selectedRows.includes(row.uniqueId)}
                   onChange={(event) => handleSelectRow(event, row)}
                 />
               </TableCell>
@@ -469,16 +522,6 @@ const ResultsTable = ({
           ))}
         </TableBody>
       </Table>
-
-      <TablePagination
-        component="div"
-        count={totalRows}
-        page={page}
-        onPageChange={handleChangePage}
-        rowsPerPage={rowsPerPage}
-        onRowsPerPageChange={handleChangeRowsPerPage}
-        rowsPerPageOptions={ROWS_PER_PAGE_OPTIONS}
-      />
     </Box>
   );
 };

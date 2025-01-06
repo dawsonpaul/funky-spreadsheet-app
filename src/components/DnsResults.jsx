@@ -86,7 +86,16 @@ const DnsResults = ({
   }
 
   return (
-    <Box sx={{ width: "100%", maxWidth: "800px", marginTop: "20px" }}>
+    <Box
+      sx={{
+        width: "100%",
+        maxWidth: "800px",
+        margin: "20px auto",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+      }}
+    >
       {/* Tab navigation for internal and external DNS */}
       <Tabs
         value={activeTab}
@@ -101,7 +110,7 @@ const DnsResults = ({
 
       {/* DNS records rendering */}
       {resolveResults[activeTab] ? (
-        <Box>
+        <Box sx={{ width: "100%", marginTop: "20px" }}>
           {validRecordTypes.length > 0 ? (
             <>
               <Tabs
