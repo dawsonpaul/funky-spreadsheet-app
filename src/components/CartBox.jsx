@@ -5,37 +5,33 @@ import { useSpring, animated } from "@react-spring/web";
 
 const CartBox = ({ cart, themeMode, onShowCollected }) => {
   const [anchorEl, setAnchorEl] = useState(null);
-  const [prevCartLength, setPrevCartLength] = useState(cart.length); // Previous cart length
-  const [isHovered, setIsHovered] = useState(false); // Hover state for popup
+  const [prevCartLength, setPrevCartLength] = useState(cart.length);
+  const [isHovered, setIsHovered] = useState(false);
   const open = Boolean(anchorEl);
 
   // React Spring animation for the bubble
   const [style, api] = useSpring(() => ({
     transform: "scale(1)",
-    backgroundColor: themeMode === "dark" ? "#424242" : "#ffffff", // Default color
+    backgroundColor: themeMode === "dark" ? "#424242" : "#ffffff",
     config: { tension: 200, friction: 20 },
   }));
 
-  // Update animation when `themeMode` changes
   useEffect(() => {
     api.start({
       backgroundColor: themeMode === "dark" ? "#424242" : "#ffffff",
     });
   }, [themeMode, api]);
 
-  // Trigger animation when cart changes
   useEffect(() => {
     if (cart.length !== prevCartLength) {
       const isAdding = cart.length > prevCartLength;
       setPrevCartLength(cart.length);
 
-      // Start animation
       api.start({
         transform: "scale(1.2)",
-        backgroundColor: isAdding ? "#a5d6a7" : "#ef9a9a", // Light green for add, light red for remove
+        backgroundColor: isAdding ? "#a5d6a7" : "#ef9a9a",
       });
 
-      // Reset animation
       setTimeout(
         () =>
           api.start({
@@ -100,7 +96,7 @@ const CartBox = ({ cart, themeMode, onShowCollected }) => {
   return (
     <animated.div
       style={{
-        ...style, // Apply React Spring animation
+        ...style,
         position: "fixed",
         top: "100px",
         right: "100px",
@@ -125,7 +121,7 @@ const CartBox = ({ cart, themeMode, onShowCollected }) => {
           display: "flex",
           alignItems: "center",
           gap: "10px",
-          color: themeMode === "dark" ? "#e0e0e0" : "#000", // Ensure text color matches theme
+          color: themeMode === "dark" ? "#e0e0e0" : "#000",
         }}
       >
         <Typography
@@ -164,13 +160,19 @@ const CartBox = ({ cart, themeMode, onShowCollected }) => {
         </Button>
       </Box>
 
+      <Menu anchorEl={anchorEl} open={open} onClose={handleClose}>
+        <MenuItem onClick={exportToJson}>Export to JSON</MenuItem>
+        <MenuItem onClick={exportToCsv}>Export to CSV</MenuItem>
+        <MenuItem onClick={exportToXlsx}>Export to XLSX</MenuItem>
+      </Menu>
+
       {/* Popup */}
       {isHovered && cart.length > 0 && (
         <Paper
           elevation={3}
           sx={{
             position: "absolute",
-            top: "50px", // Offset slightly below the basket
+            top: "50px",
             right: "10px",
             padding: "10px",
             borderRadius: "8px",
@@ -182,7 +184,7 @@ const CartBox = ({ cart, themeMode, onShowCollected }) => {
                 : "0 4px 8px rgba(0, 0, 0, 0.2)",
             maxWidth: "300px",
             overflowY: "auto",
-            maxHeight: "200px", // Limit height
+            maxHeight: "200px",
           }}
         >
           <Typography
