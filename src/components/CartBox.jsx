@@ -97,9 +97,6 @@ const CartBox = ({ cart, themeMode, onShowCollected }) => {
     <animated.div
       style={{
         ...style,
-        position: "fixed",
-        top: "100px",
-        right: "100px",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -110,12 +107,10 @@ const CartBox = ({ cart, themeMode, onShowCollected }) => {
           themeMode === "dark"
             ? "0 4px 8px rgba(0, 0, 0, 0.8)"
             : "0 4px 8px rgba(0, 0, 0, 0.2)",
-        zIndex: 10,
       }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Basket (Text and Icon) */}
       <Box
         sx={{
           display: "flex",
@@ -143,17 +138,6 @@ const CartBox = ({ cart, themeMode, onShowCollected }) => {
           sx={{
             color: themeMode === "light" ? "#1976d2" : "#90caf9",
             borderColor: themeMode === "light" ? "#1976d2" : "#90caf9",
-            backgroundColor: "transparent",
-            "&.Mui-disabled": {
-              color:
-                themeMode === "light"
-                  ? "rgba(25, 118, 210, 0.3)"
-                  : "rgba(144, 202, 249, 0.3)",
-              borderColor:
-                themeMode === "light"
-                  ? "rgba(25, 118, 210, 0.3)"
-                  : "rgba(144, 202, 249, 0.3)",
-            },
           }}
         >
           📥

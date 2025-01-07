@@ -5,12 +5,21 @@ export const handleFileRead = (binaryStr, onSuccess, onError) => {
     const workbook = XLSX.read(binaryStr, { type: "binary" });
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
-    const jsonData = XLSX.utils.sheet_to_json(sheet);
+    let jsonData = XLSX.utils.sheet_to_json(sheet);
 
     if (jsonData.length === 0) {
       onError("The file is empty or invalid.");
       return;
     }
+
+    // Convert boolean values to "true"/"false" strings
+    jsonData = jsonData.map((row) =>
+      Object.keys(row).reduce((acc, key) => {
+        const value = row[key];
+        acc[key] = typeof value === "boolean" ? value.toString() : value;
+        return acc;
+      }, {})
+    );
 
     onSuccess(jsonData, Object.keys(jsonData[0]));
   } catch (err) {

@@ -227,13 +227,18 @@ const App = () => {
           </Box>
         ) : (
           <Box sx={{ maxWidth: "1600px", width: "100%", margin: "0 auto" }}>
-            <CartBox
+            {/* <CartBox
               cart={cart}
               themeMode={themeMode}
               onShowCollected={() => setShowCollected((prev) => !prev)}
               onSearchTermChange={handleSearchTermChange}
+            /> */}
+            <Header
+              themeMode={themeMode}
+              onThemeToggle={handleThemeToggle}
+              cart={cart} // Pass cart state
+              onShowCollected={() => setShowCollected((prev) => !prev)} // Pass handler for collected items
             />
-            <Header themeMode={themeMode} onThemeToggle={handleThemeToggle} />
             <FileUpload onFileUpload={handleFileUpload} error={error} />
 
             {fqdnData.length > 0 && (
