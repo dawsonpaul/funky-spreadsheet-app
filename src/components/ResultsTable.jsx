@@ -66,6 +66,9 @@ const ResultsTable = ({
   onResolve,
   onFetchCert,
   certFqdn,
+  loadingF5,
+  onCheckF5
+
 }) => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(ROWS_PER_PAGE_OPTIONS[0]);
@@ -330,6 +333,7 @@ const ResultsTable = ({
             </TableCell>
             <TableCell sx={tableCellStyles.action}>DNS Query</TableCell>
             <TableCell sx={tableCellStyles.action}>Get Cert</TableCell>
+            <TableCell sx={tableCellStyles.action}>F5 Query</TableCell>
             <TableCell sx={tableCellStyles.action}>Copy</TableCell>
             {columns
               .filter((col) => col !== "FQDN" && col !== "APPID")
@@ -481,6 +485,33 @@ const ResultsTable = ({
                   )}
                 </Button>
               </TableCell>
+
+              <TableCell sx={tableCellStyles.action}>
+                <Button
+                  variant="contained"
+                  size="small"
+                  onClick={() => onCheckF5(row.FQDN)}
+                  disabled={loadingF5 === row.FQDN}
+                  sx={{
+                    backgroundColor:
+                      loadingF5 === row.FQDN
+                        ? themeMode === "light"
+                          ? "#e0e0e0"
+                          : "#424242"
+                        : themeMode === "light"
+                        ? "#1976d2"
+                        : "#90caf9",
+                    color: themeMode === "dark" ? "#000" : "#fff",
+                  }}
+                >
+                  {loadingF5 === row.FQDN ? (
+                    <CircularProgress size={20} color="inherit" />
+                  ) : (
+                    "Check F5"
+                  )}
+                </Button>
+              </TableCell>
+
               {/* Copy Action */}
               <TableCell sx={tableCellStyles.action}>
                 <Tooltip
@@ -506,6 +537,7 @@ const ResultsTable = ({
                   </Button>
                 </Tooltip>
               </TableCell>
+
               {/* Dynamic Columns */}
               {columns
                 .filter((col) => col !== "FQDN" && col !== "APPID")

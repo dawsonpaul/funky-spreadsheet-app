@@ -6,6 +6,7 @@ import {
   Typography,
   CircularProgress,
 } from "@mui/material";
+import ReactJson from "react-json-view";
 import { lightTheme, darkTheme } from "./themes/themes.js";
 import Header from "./components/Header";
 import CartBox from "./components/CartBox";
@@ -16,6 +17,7 @@ import DnsResults from "./components/DnsResults";
 import ColumnManager from "./components/ColumnManager";
 import CertResults from "./components/CertResults.jsx";
 import { handleFileRead } from "./utils/fileHandlers";
+import F5Results from "./components/F5Results";
 
 const DEFAULT_FILE_PATH = "../example.xlsx";
 
@@ -115,6 +117,8 @@ const App = () => {
     setCertFqdn(null); // Reset certFqdn when resolving
     setCertResults(null); // Clear cert results
     setLoadingFqdn(fqdn); // Show loading spinner for this FQDN
+    setF5Results(null); // Clear Check F5
+
     try {
       const response = await fetch("http://localhost:5005/resolve", {
         method: "POST",
@@ -138,6 +142,8 @@ const App = () => {
     setResolvedFqdn(null); // Reset resolvedFqdn when fetching cert
     setResolveResults(null); // Clear resolve results
     setLoadingCert(fqdn); // Show loading spinner for this FQDN
+    setF5Results(null); // Clear Check F5
+
     const timeout = 10000; // Timeout in milliseconds (10 seconds)
 
     try {
@@ -192,6 +198,45 @@ const App = () => {
       return value.includes(search);
     });
   }, [fqdnData, selectedColumn, searchTerm]);
+
+  const [f5Results, setF5Results] = useState(null);
+  const [loadingF5, setLoadingF5] = useState("");
+
+  const handleCheckF5 = async (fqdn) => {
+    console.log("Starting Check F5 with FQDN:", fqdn);
+
+    // Reset other states
+    setResolvedFqdn(null); // Clear Resolve
+    setCertFqdn(null); // Clear Get Cert
+    setResolveResults(null); // Clear DNS Resolve results
+    setCertResults(null); // Clear Cert results
+
+    setLoadingF5(fqdn); // Set loading for Check F5
+
+    try {
+      const response = await fetch("http://localhost:5006/checkF5", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fqdn }),
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          `API error: ${response.status} - ${response.statusText}`
+        );
+      }
+
+      const data = await response.json();
+      console.log("Check F5 data:", data);
+
+      setF5Results({ fqdn, ...data });
+    } catch (error) {
+      console.error("Error checking F5:", error.message);
+      setF5Results({ error: `Error: ${error.message}` });
+    } finally {
+      setLoadingF5(""); // Reset loading state
+    }
+  };
 
   return (
     <ThemeProvider theme={themeMode === "light" ? lightTheme : darkTheme}>
@@ -272,6 +317,8 @@ const App = () => {
                   onFetchCert={handleFetchCert}
                   onCollect={handleCollect}
                   certFqdn={certFqdn}
+                  loadingF5={loadingF5}
+                  onCheckF5={handleCheckF5}
                 />
 
                 <Box
@@ -291,7 +338,7 @@ const App = () => {
                         setLoadingFqdn("");
                       }}
                     >
-                      Reset FQDN
+                      Reset Resolve
                     </Button>
                   )}
 
@@ -303,7 +350,19 @@ const App = () => {
                         setCertResults(null);
                       }}
                     >
-                      Reset Cert
+                      Reset Get Cert
+                    </Button>
+                  )}
+
+                  {f5Results && (
+                    <Button
+                      variant="outlined"
+                      onClick={() => {
+                        setF5Results(null); // Clear F5 results
+                        setLoadingF5(""); // Reset F5 loading state
+                      }}
+                    >
+                      Reset Check F5
                     </Button>
                   )}
                 </Box>
@@ -322,6 +381,8 @@ const App = () => {
               certResults={certResults}
               onClose={() => setCertResults(null)}
             />
+
+            <F5Results f5Results={f5Results} themeMode={themeMode} />
           </Box>
         )}
       </Box>
