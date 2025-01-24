@@ -393,6 +393,7 @@ const ResultsTable = ({
             <TableCell sx={tableCellStyles.action}></TableCell>
             <TableCell sx={tableCellStyles.action}></TableCell>
             <TableCell sx={tableCellStyles.action}></TableCell>
+            <TableCell sx={tableCellStyles.action}></TableCell>
             {columns
               .filter((col) => col !== "FQDN" && col !== "APPID")
               .map((col) => (

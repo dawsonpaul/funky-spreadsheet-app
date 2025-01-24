@@ -278,6 +278,7 @@ const App = () => {
               onShowCollected={() => setShowCollected((prev) => !prev)}
               onSearchTermChange={handleSearchTermChange}
             /> */}
+            
             <Header
               themeMode={themeMode}
               onThemeToggle={handleThemeToggle}

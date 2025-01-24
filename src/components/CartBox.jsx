@@ -103,10 +103,12 @@ const CartBox = ({ cart, themeMode, onShowCollected }) => {
         gap: "10px",
         padding: "10px 20px",
         borderRadius: "20px",
+        backgroundColor: themeMode === "dark" ? "#333333" : "#ffffff", // Solid background
         boxShadow:
           themeMode === "dark"
-            ? "0 4px 8px rgba(0, 0, 0, 0.8)"
-            : "0 4px 8px rgba(0, 0, 0, 0.2)",
+            ? "0px 4px 8px rgba(0, 0, 0, 0.8)"
+            : "0px 4px 8px rgba(0, 0, 0, 0.2)", // Visual depth
+        zIndex: 1200, // Ensure it is above the main content but below the Paper
       }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -160,12 +162,13 @@ const CartBox = ({ cart, themeMode, onShowCollected }) => {
             right: "10px",
             padding: "10px",
             borderRadius: "8px",
-            backgroundColor: themeMode === "dark" ? "#424242" : "#ffffff",
+            backgroundColor: themeMode === "dark" ? "#333333" : "#ffffff", // Solid background
             color: themeMode === "dark" ? "#e0e0e0" : "#000",
             boxShadow:
               themeMode === "dark"
-                ? "0 4px 8px rgba(0, 0, 0, 0.8)"
-                : "0 4px 8px rgba(0, 0, 0, 0.2)",
+                ? "0px 4px 8px rgba(0, 0, 0, 0.8)"
+                : "0px 4px 8px rgba(0, 0, 0, 0.2)", // Ensure visibility
+            zIndex: 1300, // Higher than other components
             maxWidth: "300px",
             overflowY: "auto",
             maxHeight: "200px",
