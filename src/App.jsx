@@ -320,6 +320,7 @@ const App = () => {
                   certFqdn={certFqdn}
                   loadingF5={loadingF5}
                   onCheckF5={handleCheckF5}
+                  f5Results={f5Results} 
                 />
 
                 <Box

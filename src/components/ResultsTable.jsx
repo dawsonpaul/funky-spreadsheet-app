@@ -67,7 +67,8 @@ const ResultsTable = ({
   onFetchCert,
   certFqdn,
   loadingF5,
-  onCheckF5
+  onCheckF5,
+  f5Results, 
 
 }) => {
   const [page, setPage] = useState(0);
@@ -134,6 +135,7 @@ const ResultsTable = ({
       // Apply resolvedFqdn or certFqdn filter if set
       if (resolvedFqdn) return row.FQDN === resolvedFqdn;
       if (certFqdn) return row.FQDN === certFqdn;
+      if (f5Results && f5Results.fqdn) return row.FQDN === f5Results.fqdn;
       return true;
     })
     .filter((row) => {
