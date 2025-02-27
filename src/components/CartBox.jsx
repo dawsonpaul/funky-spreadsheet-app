@@ -192,8 +192,8 @@ const CartBox = ({ cart, themeMode, onShowCollected }) => {
               color: themeMode === "dark" ? "#e0e0e0" : "#000",
             }}
           >
-            {cart.map((item, index) => (
-              <li key={index} style={{ fontSize: "0.85rem" }}>
+            {cart.map((item) => (
+              <li key={item.uniqueId} style={{ fontSize: "0.85rem" }}>
                 {item.FQDN || "Unknown"}
               </li>
             ))}

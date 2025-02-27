@@ -40,6 +40,8 @@ const App = () => {
   const [loadingCert, setLoadingCert] = useState("");
   const [resolvedFqdn, setResolvedFqdn] = useState(null); // For DNS Resolve
   const [certFqdn, setCertFqdn] = useState(null); // For Get Cert
+  const [resolvedUniqueId, setResolvedUniqueId] = useState(null);
+  const [certUniqueId, setCertUniqueId] = useState(null);
 
   // Load default data on mount
   useEffect(() => {
@@ -112,12 +114,13 @@ const App = () => {
     }
   };
 
-  const handleResolve = async (fqdn) => {
-    setResolvedFqdn(fqdn); // Set resolved FQDN
-    setCertFqdn(null); // Reset certFqdn when resolving
-    setCertResults(null); // Clear cert results
-    setLoadingFqdn(fqdn); // Show loading spinner for this FQDN
-    setF5Results(null); // Clear Check F5
+  const handleResolve = async (fqdn, uniqueId) => {
+    setResolvedFqdn(fqdn);
+    setResolvedUniqueId(uniqueId);
+    setCertFqdn(null);
+    setCertResults(null);
+    setLoadingFqdn(fqdn);
+    setF5Results(null);
 
     try {
       const response = await fetch("http://localhost:5005/resolve", {
@@ -127,24 +130,24 @@ const App = () => {
       });
       const data = await response.json();
 
-      // Set resolve results
       setResolveResults(data);
     } catch (error) {
       console.error("Error resolving DNS:", error);
       setResolveResults(null);
     } finally {
-      setLoadingFqdn(""); // Reset loading state
+      setLoadingFqdn("");
     }
   };
 
-  const handleFetchCert = async (fqdn) => {
-    setCertFqdn(fqdn); // Set cert FQDN
-    setResolvedFqdn(null); // Reset resolvedFqdn when fetching cert
-    setResolveResults(null); // Clear resolve results
-    setLoadingCert(fqdn); // Show loading spinner for this FQDN
-    setF5Results(null); // Clear Check F5
+  const handleFetchCert = async (fqdn, uniqueId) => {
+    setCertFqdn(fqdn);
+    setCertUniqueId(uniqueId);
+    setResolvedFqdn(null);
+    setResolveResults(null);
+    setLoadingCert(fqdn);
+    setF5Results(null);
 
-    const timeout = 10000; // Timeout in milliseconds (10 seconds)
+    const timeout = 10000;
 
     try {
       const response = await Promise.race([
@@ -160,23 +163,31 @@ const App = () => {
 
       const certData = await response.json();
       console.log("Certificate fetched:", certData);
-      setCertResults(certData); // Update state with fetched certificate
+      setCertResults(certData);
     } catch (error) {
       console.error("Error fetching certificate:", error.message);
-      setCertResults({ error: error.message }); // Display error message in certResults
+      setCertResults({ error: error.message });
     } finally {
-      setLoadingCert(""); // Reset loading state
+      setLoadingCert("");
     }
   };
 
   const handleCollect = (row) => {
+    if (!row.uniqueId) {
+      console.error("Row missing uniqueId:", row);
+      return;
+    }
+
     setCart((prevCart) => {
       const isAlreadyCollected = prevCart.some(
         (item) => item.uniqueId === row.uniqueId
       );
-      return isAlreadyCollected
-        ? prevCart.filter((item) => item.uniqueId !== row.uniqueId)
-        : [...prevCart, row];
+
+      if (isAlreadyCollected) {
+        return prevCart.filter((item) => item.uniqueId !== row.uniqueId);
+      } else {
+        return [...prevCart, row];
+      }
     });
   };
 
@@ -202,16 +213,15 @@ const App = () => {
   const [f5Results, setF5Results] = useState(null);
   const [loadingF5, setLoadingF5] = useState("");
 
-  const handleCheckF5 = async (fqdn) => {
+  const handleCheckF5 = async (fqdn, uniqueId) => {
     console.log("Starting Check F5 with FQDN:", fqdn);
 
-    // Reset other states
-    setResolvedFqdn(null); // Clear Resolve
-    setCertFqdn(null); // Clear Get Cert
-    setResolveResults(null); // Clear DNS Resolve results
-    setCertResults(null); // Clear Cert results
+    setResolvedFqdn(null);
+    setCertFqdn(null);
+    setResolveResults(null);
+    setCertResults(null);
 
-    setLoadingF5(fqdn); // Set loading for Check F5
+    setLoadingF5(fqdn);
 
     try {
       const response = await fetch("http://localhost:5006/checkF5", {
@@ -229,12 +239,12 @@ const App = () => {
       const data = await response.json();
       console.log("Check F5 data:", data);
 
-      setF5Results({ fqdn, ...data });
+      setF5Results({ fqdn, uniqueId, ...data });
     } catch (error) {
       console.error("Error checking F5:", error.message);
       setF5Results({ error: `Error: ${error.message}` });
     } finally {
-      setLoadingF5(""); // Reset loading state
+      setLoadingF5("");
     }
   };
 
@@ -278,12 +288,12 @@ const App = () => {
               onShowCollected={() => setShowCollected((prev) => !prev)}
               onSearchTermChange={handleSearchTermChange}
             /> */}
-            
+
             <Header
               themeMode={themeMode}
               onThemeToggle={handleThemeToggle}
-              cart={cart} // Pass cart state
-              onShowCollected={() => setShowCollected((prev) => !prev)} // Pass handler for collected items
+              cart={cart}
+              onShowCollected={() => setShowCollected((prev) => !prev)}
             />
             <FileUpload onFileUpload={handleFileUpload} error={error} />
 
@@ -302,6 +312,7 @@ const App = () => {
                   visibleColumns={visibleColumns}
                   onColumnChange={setVisibleColumns}
                   defaultColumns={defaultColumns}
+                  themeMode={themeMode}
                 />
 
                 <ResultsTable
@@ -309,6 +320,7 @@ const App = () => {
                   columns={visibleColumns}
                   filteredData={filteredData}
                   resolvedFqdn={resolvedFqdn}
+                  resolvedUniqueId={resolvedUniqueId}
                   showCollected={showCollected}
                   cart={cart}
                   loadingFqdn={loadingFqdn}
@@ -318,9 +330,10 @@ const App = () => {
                   onFetchCert={handleFetchCert}
                   onCollect={handleCollect}
                   certFqdn={certFqdn}
+                  certUniqueId={certUniqueId}
                   loadingF5={loadingF5}
                   onCheckF5={handleCheckF5}
-                  f5Results={f5Results} 
+                  f5Results={f5Results}
                 />
 
                 <Box
@@ -335,7 +348,7 @@ const App = () => {
                     <Button
                       variant="outlined"
                       onClick={() => {
-                        setResolvedFqdn(null); // Clear DNS Resolve state
+                        setResolvedFqdn(null);
                         setResolveResults(null);
                         setLoadingFqdn("");
                       }}
@@ -348,7 +361,7 @@ const App = () => {
                     <Button
                       variant="outlined"
                       onClick={() => {
-                        setCertFqdn(null); // Clear Cert state
+                        setCertFqdn(null);
                         setCertResults(null);
                       }}
                     >
@@ -360,8 +373,8 @@ const App = () => {
                     <Button
                       variant="outlined"
                       onClick={() => {
-                        setF5Results(null); // Clear F5 results
-                        setLoadingF5(""); // Reset F5 loading state
+                        setF5Results(null);
+                        setLoadingF5("");
                       }}
                     >
                       Reset Check F5

@@ -13,6 +13,7 @@
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@fidm/x509": "^1.2.1",
+    "@mui/icons-material": "^6.4.6",
     "@mui/material": "^6.2.1",
     "@react-spring/web": "^9.7.5",
     "@tanstack/react-table": "^8.20.6",

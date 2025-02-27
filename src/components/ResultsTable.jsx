@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   Table,
   TableBody,
@@ -50,7 +50,8 @@ const tableCellStyles = {
 };
 
 const createUniqueId = (row, index) => {
-  return `${row.FQDN}_${index}`;
+  // Use a combination of FQDN, APPID, and index to ensure uniqueness
+  return `${row.FQDN}_${row.APPID || ""}_${index}`;
 };
 
 const ResultsTable = ({
@@ -68,8 +69,9 @@ const ResultsTable = ({
   certFqdn,
   loadingF5,
   onCheckF5,
-  f5Results, 
-
+  f5Results,
+  resolvedUniqueId,
+  certUniqueId,
 }) => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(ROWS_PER_PAGE_OPTIONS[0]);
@@ -80,6 +82,18 @@ const ResultsTable = ({
   const startX = useRef(null);
   const startWidth = useRef(null);
   const [columnFilters, setColumnFilters] = useState({});
+
+  useEffect(() => {
+    console.log("Filtering with:", {
+      resolvedFqdn,
+      resolvedUniqueId,
+      certFqdn,
+      certUniqueId,
+      f5Results: f5Results
+        ? { fqdn: f5Results.fqdn, uniqueId: f5Results.uniqueId }
+        : null,
+    });
+  }, [resolvedFqdn, resolvedUniqueId, certFqdn, certUniqueId, f5Results]);
 
   const handleResizeStart = (e, columnId) => {
     resizingColumn.current = columnId;
@@ -122,6 +136,10 @@ const ResultsTable = ({
   };
 
   const displayData = filteredData
+    .map((row, index) => ({
+      ...row,
+      uniqueId: createUniqueId(row, index),
+    }))
     .filter((row) => {
       // Apply column filters
       return Object.keys(columnFilters).every((col) =>
@@ -133,19 +151,42 @@ const ResultsTable = ({
     })
     .filter((row) => {
       // Apply resolvedFqdn or certFqdn filter if set
-      if (resolvedFqdn) return row.FQDN === resolvedFqdn;
-      if (certFqdn) return row.FQDN === certFqdn;
-      if (f5Results && f5Results.fqdn) return row.FQDN === f5Results.fqdn;
+      if (resolvedFqdn) {
+        console.log("Filtering for resolvedFqdn:", resolvedFqdn);
+        console.log("resolvedUniqueId:", resolvedUniqueId);
+        console.log("Current row:", row.FQDN, row.uniqueId);
+        return resolvedUniqueId
+          ? row.uniqueId === resolvedUniqueId
+          : row.FQDN === resolvedFqdn;
+      }
+
+      if (certFqdn) {
+        console.log("Filtering for certFqdn:", certFqdn);
+        console.log("certUniqueId:", certUniqueId);
+        console.log("Current row:", row.FQDN, row.uniqueId);
+        return certUniqueId
+          ? row.uniqueId === certUniqueId
+          : row.FQDN === certFqdn;
+      }
+
+      if (f5Results && f5Results.fqdn) {
+        console.log("Filtering for f5Results:", f5Results.fqdn);
+        console.log("f5Results.uniqueId:", f5Results.uniqueId);
+        console.log("Current row:", row.FQDN, row.uniqueId);
+        return f5Results.uniqueId
+          ? row.uniqueId === f5Results.uniqueId
+          : row.FQDN === f5Results.fqdn;
+      }
+
       return true;
     })
     .filter((row) => {
       // Apply cart filter if showing collected rows
-      return !showCollected || cart.some((item) => item.FQDN === row.FQDN);
-    })
-    .map((row, index) => ({
-      ...row,
-      uniqueId: createUniqueId(row, index),
-    }));
+      if (!showCollected) return true;
+
+      // When showing collected items, use exact uniqueId matching
+      return cart.some((item) => item.uniqueId === row.uniqueId);
+    });
 
   const handleSelectAllClick = (event) => {
     if (event.target.checked) {
@@ -178,16 +219,28 @@ const ResultsTable = ({
   const handleSelectRow = (event, row) => {
     const isChecked = event.target.checked;
 
+    // Ensure we're working with the exact row that has a uniqueId
+    const rowWithUniqueId = {
+      ...row,
+      uniqueId: row.uniqueId, // Preserve the uniqueId
+    };
+
     if (isChecked) {
-      // Add the row to the selected state and cart if it's not already there
-      if (!selectedRows.includes(row.uniqueId)) {
-        setSelectedRows((prev) => [...prev, row.uniqueId]);
-        onCollect(row);
+      // Add the row to the selected state
+      setSelectedRows((prev) => [...prev, rowWithUniqueId.uniqueId]);
+
+      // Add to cart if not already there (by uniqueId)
+      if (!cart.some((item) => item.uniqueId === rowWithUniqueId.uniqueId)) {
+        onCollect(rowWithUniqueId);
       }
     } else {
-      // Remove the row from the selected state and cart
-      setSelectedRows((prev) => prev.filter((id) => id !== row.uniqueId));
-      onCollect(row, true); // Pass a flag indicating removal
+      // Remove from selected state
+      setSelectedRows((prev) =>
+        prev.filter((id) => id !== rowWithUniqueId.uniqueId)
+      );
+
+      // Remove from cart
+      onCollect(rowWithUniqueId);
     }
   };
 
@@ -303,12 +356,8 @@ const ResultsTable = ({
               <Checkbox
                 color="primary"
                 indeterminate={
-                  paginatedData.some((row) =>
-                    selectedRows.includes(row.uniqueId)
-                  ) &&
-                  !paginatedData.every((row) =>
-                    selectedRows.includes(row.uniqueId)
-                  )
+                  selectedRows.length > 0 &&
+                  selectedRows.length < paginatedData.length
                 }
                 checked={
                   paginatedData.length > 0 &&
@@ -319,33 +368,21 @@ const ResultsTable = ({
                 onChange={handleSelectAllClick}
               />
             </TableCell>
-            <TableCell sx={getColumnStyle("FQDN")}>
-              FQDN
-              <div
-                style={tableCellStyles.resizeHandle}
-                onMouseDown={(e) => handleResizeStart(e, "FQDN")}
-              />
-            </TableCell>
-            <TableCell sx={getColumnStyle("APPID")}>
-              APPID
-              <div
-                style={tableCellStyles.resizeHandle}
-                onMouseDown={(e) => handleResizeStart(e, "APPID")}
-              />
-            </TableCell>
-            <TableCell sx={tableCellStyles.action}>DNS Query</TableCell>
+            {/* Fixed FQDN Column */}
+            <TableCell sx={getColumnStyle("FQDN")}>FQDN</TableCell>
+            {/* Fixed APPID Column */}
+            <TableCell sx={getColumnStyle("APPID")}>APPID</TableCell>
+            {/* Action Columns */}
+            <TableCell sx={tableCellStyles.action}>Resolve</TableCell>
             <TableCell sx={tableCellStyles.action}>Get Cert</TableCell>
-            <TableCell sx={tableCellStyles.action}>F5 Query</TableCell>
+            <TableCell sx={tableCellStyles.action}>Check F5</TableCell>
             <TableCell sx={tableCellStyles.action}>Copy</TableCell>
+            {/* Dynamic Columns - Use the order from visibleColumns */}
             {columns
               .filter((col) => col !== "FQDN" && col !== "APPID")
               .map((col) => (
                 <TableCell key={col} sx={getColumnStyle(col)}>
                   {col}
-                  <div
-                    style={tableCellStyles.resizeHandle}
-                    onMouseDown={(e) => handleResizeStart(e, col)}
-                  />
                 </TableCell>
               ))}
           </TableRow>
@@ -441,7 +478,7 @@ const ResultsTable = ({
                 <Button
                   variant="contained"
                   size="small"
-                  onClick={() => onResolve(row.FQDN)}
+                  onClick={() => onResolve(row.FQDN, row.uniqueId)}
                   disabled={loadingFqdn === row.FQDN}
                   sx={{
                     backgroundColor:
@@ -467,7 +504,7 @@ const ResultsTable = ({
                 <Button
                   variant="contained"
                   size="small"
-                  onClick={() => onFetchCert(row.FQDN)}
+                  onClick={() => onFetchCert(row.FQDN, row.uniqueId)}
                   disabled={loadingCert === row.FQDN}
                   sx={{
                     backgroundColor:
@@ -493,7 +530,7 @@ const ResultsTable = ({
                 <Button
                   variant="contained"
                   size="small"
-                  onClick={() => onCheckF5(row.FQDN)}
+                  onClick={() => onCheckF5(row.FQDN, row.uniqueId)}
                   disabled={loadingF5 === row.FQDN}
                   sx={{
                     backgroundColor:
