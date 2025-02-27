@@ -12,6 +12,7 @@ import {
   Typography,
   Tooltip,
   Checkbox,
+  IconButton,
 } from "@mui/material";
 import EmailHoverMenu from "./EmailHoverMenu";
 
@@ -52,6 +53,41 @@ const tableCellStyles = {
 const createUniqueId = (row, index) => {
   // Use a combination of FQDN, APPID, and index to ensure uniqueness
   return `${row.FQDN}_${row.APPID || ""}_${index}`;
+};
+
+const CopyableCell = ({ value }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = (e) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(value || "");
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  return (
+    <Box sx={{ display: "flex", alignItems: "center", position: "relative" }}>
+      <Box sx={{ flexGrow: 1, mr: 3 }}>{value}</Box>
+      <Tooltip title={copied ? "Copied!" : "Copy value"}>
+        <IconButton
+          size="small"
+          onClick={handleCopy}
+          sx={{
+            position: "absolute",
+            right: 0,
+            opacity: 0.3,
+            "&:hover": { opacity: 1 },
+            padding: "2px",
+            fontSize: "0.75rem",
+          }}
+        >
+          <Box component="span" role="img" aria-label="copy">
+            {copied ? "✓" : "📋"}
+          </Box>
+        </IconButton>
+      </Tooltip>
+    </Box>
+  );
 };
 
 const ResultsTable = ({
@@ -470,9 +506,13 @@ const ResultsTable = ({
                 />
               </TableCell>
               {/* Fixed FQDN Column */}
-              <TableCell sx={getColumnStyle("FQDN")}>{row.FQDN}</TableCell>
+              <TableCell sx={getColumnStyle("FQDN")}>
+                <CopyableCell value={row.FQDN} />
+              </TableCell>
               {/* Fixed APPID Column */}
-              <TableCell sx={getColumnStyle("APPID")}>{row.APPID}</TableCell>
+              <TableCell sx={getColumnStyle("APPID")}>
+                <CopyableCell value={row.APPID} />
+              </TableCell>
               {/* DNS Query Action */}
               <TableCell sx={tableCellStyles.action}>
                 <Button
@@ -586,7 +626,7 @@ const ResultsTable = ({
                     {col.toLowerCase().includes("email") ? (
                       <EmailHoverMenu email={row[col]} />
                     ) : (
-                      row[col]
+                      <CopyableCell value={row[col]} />
                     )}
                   </TableCell>
                 ))}
