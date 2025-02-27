@@ -163,8 +163,14 @@ const CopyableObject = ({ data }) => {
   );
 };
 
+// Helper function to determine if a key is LTM-related
+const isLtmKey = (key) => {
+  const ltmKeywords = ['ltm', 'virtual', 'pool', 'node', 'member', 'profile', 'rule', 'snat', 'monitor'];
+  return ltmKeywords.some(keyword => key.toLowerCase().includes(keyword));
+};
+
 // Helper function to render nested objects
-const renderNestedObject = (data, level = 0) => {
+const renderNestedObject = (data, level = 0, path = "") => {
   if (data === null)
     return (
       <Box sx={{ display: "flex", alignItems: "center" }}>
@@ -219,7 +225,16 @@ const renderNestedObject = (data, level = 0) => {
       );
 
     return (
-      <Box sx={{ pl: 1.5 }}>
+      <Box 
+        sx={{ 
+          pl: 1.5,
+          maxHeight: level === 0 ? "none" : "300px",
+          overflow: level === 0 ? "visible" : "auto",
+          border: level > 0 ? "1px solid rgba(0,0,0,0.1)" : "none",
+          borderRadius: level > 0 ? 1 : 0,
+          mb: 1
+        }}
+      >
         {data.map((item, index) => (
           <Box key={index} sx={{ display: "flex", mb: 0.5 }}>
             <Typography
@@ -228,7 +243,7 @@ const renderNestedObject = (data, level = 0) => {
             >
               [{index}]:
             </Typography>
-            {renderNestedObject(item, level + 1)}
+            {renderNestedObject(item, level + 1, `${path}[${index}]`)}
           </Box>
         ))}
       </Box>
@@ -247,6 +262,65 @@ const renderNestedObject = (data, level = 0) => {
       </Typography>
     );
 
+  // For top-level objects, don't use a table container
+  if (level === 0) {
+    return (
+      <Box sx={{ width: "100%" }}>
+        {keys.map((key) => {
+          const isLtm = isLtmKey(key);
+          return (
+            <Box 
+              key={key} 
+              sx={{ 
+                mb: 2,
+                backgroundColor: isLtm 
+                  ? (theme) => theme.palette.mode === "dark" 
+                    ? "rgba(255, 255, 255, 0.07)" 
+                    : "rgba(0, 0, 0, 0.04)"
+                  : "transparent",
+                borderRadius: 1,
+                overflow: "hidden"
+              }}
+            >
+              <Box 
+                sx={{ 
+                  display: "flex", 
+                  alignItems: "center", 
+                  p: 1,
+                  borderBottom: "1px solid",
+                  borderColor: "divider",
+                  backgroundColor: isLtm 
+                    ? (theme) => theme.palette.mode === "dark" 
+                      ? "rgba(255, 255, 255, 0.1)" 
+                      : "rgba(0, 0, 0, 0.06)"
+                    : (theme) => theme.palette.mode === "dark" 
+                      ? "rgba(255, 255, 255, 0.05)" 
+                      : "rgba(0, 0, 0, 0.03)",
+                }}
+              >
+                <Typography 
+                  sx={{ 
+                    fontSize: "1rem", 
+                    fontWeight: "bold",
+                    flexGrow: 1
+                  }}
+                >
+                  {key} {isLtm && <span style={{ fontSize: "0.8rem", opacity: 0.7 }}>(LTM)</span>}
+                </Typography>
+                {typeof data[key] === "object" && data[key] !== null && (
+                  <CopyableObject data={data[key]} />
+                )}
+              </Box>
+              <Box sx={{ p: 1 }}>
+                {renderNestedObject(data[key], level + 1, `${path}.${key}`)}
+              </Box>
+            </Box>
+          );
+        })}
+      </Box>
+    );
+  }
+
   return (
     <TableContainer
       component={Paper}
@@ -254,70 +328,74 @@ const renderNestedObject = (data, level = 0) => {
       sx={{
         mb: 0.5,
         mt: 0.5,
-        width: "auto",
-        maxWidth: "100%",
+        width: "100%",
+        maxHeight: "300px",
+        overflow: "auto",
         "& .MuiTable-root": {
-          width: "auto",
-          tableLayout: "fixed",
+          width: "100%",
         },
       }}
     >
       <Table size="small" padding="none">
         <TableBody>
-          {keys.map((key) => (
-            <TableRow
-              key={key}
-              sx={{ "&:last-child td, &:last-child th": { border: 0 } }}
-            >
-              <TableCell
-                component="th"
-                scope="row"
-                sx={{
-                  fontWeight: "bold",
-                  width: "120px",
-                  maxWidth: "120px",
-                  verticalAlign: "top",
-                  fontSize: "0.875rem",
-                  padding: "4px 8px",
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
+          {keys.map((key) => {
+            const isLtm = isLtmKey(key);
+            const currentPath = `${path}.${key}`;
+            
+            return (
+              <TableRow
+                key={key}
+                sx={{ 
+                  "&:last-child td, &:last-child th": { border: 0 },
+                  backgroundColor: isLtm 
+                    ? (theme) => theme.palette.mode === "dark" 
+                      ? "rgba(255, 255, 255, 0.07)" 
+                      : "rgba(0, 0, 0, 0.04)"
+                    : "transparent"
                 }}
               >
-                <Typography
+                <TableCell
+                  component="th"
+                  scope="row"
                   sx={{
-                    fontSize: "0.875rem",
                     fontWeight: "bold",
+                    width: "180px",
+                    maxWidth: "180px",
+                    verticalAlign: "top",
+                    fontSize: "0.875rem",
+                    padding: "8px 12px",
                     whiteSpace: "nowrap",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
+                    borderBottom: "1px solid",
+                    borderColor: "divider",
                   }}
                 >
-                  {key}
-                </Typography>
-              </TableCell>
-              <TableCell sx={{ padding: "4px 8px" }}>
-                {typeof data[key] === "object" && data[key] !== null ? (
-                  <Accordion
-                    disableGutters
-                    elevation={0}
+                  <Typography
                     sx={{
-                      "&:before": { display: "none" },
-                      backgroundColor: "transparent",
-                      width: "auto",
+                      fontSize: "0.875rem",
+                      fontWeight: "bold",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
                     }}
                   >
-                    <AccordionSummary
-                      sx={{
-                        padding: 0,
-                        minHeight: "unset",
-                        "& .MuiAccordionSummary-content": { margin: 0 },
-                      }}
-                    >
-                      <Box sx={{ display: "flex", alignItems: "center" }}>
+                    {key} {isLtm && <span style={{ fontSize: "0.7rem", opacity: 0.7 }}>(LTM)</span>}
+                  </Typography>
+                </TableCell>
+                <TableCell 
+                  sx={{ 
+                    padding: "8px 12px",
+                    borderBottom: "1px solid",
+                    borderColor: "divider",
+                  }}
+                >
+                  {typeof data[key] === "object" && data[key] !== null ? (
+                    <Box>
+                      <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                         <Typography
                           color="text.secondary"
-                          sx={{ fontSize: "0.875rem" }}
+                          sx={{ fontSize: "0.875rem", mr: 1 }}
                         >
                           {Array.isArray(data[key])
                             ? `Array [${data[key].length}]`
@@ -329,17 +407,15 @@ const renderNestedObject = (data, level = 0) => {
                         </Typography>
                         <CopyableObject data={data[key]} />
                       </Box>
-                    </AccordionSummary>
-                    <AccordionDetails sx={{ padding: 0 }}>
-                      {renderNestedObject(data[key], level + 1)}
-                    </AccordionDetails>
-                  </Accordion>
-                ) : (
-                  renderNestedObject(data[key], level + 1)
-                )}
-              </TableCell>
-            </TableRow>
-          ))}
+                      {renderNestedObject(data[key], level + 1, currentPath)}
+                    </Box>
+                  ) : (
+                    renderNestedObject(data[key], level + 1, currentPath)
+                  )}
+                </TableCell>
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
     </TableContainer>
@@ -358,7 +434,7 @@ const F5Results = ({ f5Results, themeMode }) => {
 
   return (
     <Box sx={{ width: "100%", marginTop: "20px" }}>
-      <Card elevation={2} sx={{ borderRadius: 1, maxWidth: "800px" }}>
+      <Card elevation={2} sx={{ borderRadius: 1, width: "100%" }}>
         <CardContent sx={{ padding: 2, "&:last-child": { paddingBottom: 2 } }}>
           {f5Results.error ? (
             <Typography color="error" variant="h6">
@@ -374,7 +450,7 @@ const F5Results = ({ f5Results, themeMode }) => {
                   mb: 1,
                 }}
               >
-                <Typography variant="subtitle1">F5 Check Results</Typography>
+                <Typography variant="h6">F5 Check Results</Typography>
                 <IconButton
                   size="small"
                   onClick={copyToClipboard}
@@ -386,18 +462,11 @@ const F5Results = ({ f5Results, themeMode }) => {
                 </IconButton>
               </Box>
 
-              <Divider sx={{ mb: 1 }} />
+              <Divider sx={{ mb: 2 }} />
 
               <Box
                 sx={{
-                  backgroundColor: (theme) =>
-                    theme.palette.mode === "dark"
-                      ? "rgba(255, 255, 255, 0.03)"
-                      : "rgba(0, 0, 0, 0.02)",
-                  borderRadius: 1,
-                  maxHeight: "500px",
-                  overflow: "auto",
-                  p: 1.5,
+                  width: "100%",
                 }}
               >
                 {renderNestedObject(f5Results)}
